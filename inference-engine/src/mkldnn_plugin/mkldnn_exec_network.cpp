@@ -154,7 +154,8 @@ MKLDNNExecNetwork::MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network
             numaNode = streamExecutor->GetNumaNodeId();
         }
         graph->CreateGraph(static_cast<ICNNNetwork&>(*localNetwork), extensionManager, numaNodesWeights[numaNode]);
-        return graph;
+        std::map<int, MKLDNNGraph::Ptr> m { {0, graph} };
+        return m;
     }};
 
     _taskExecutor->runAndWait({std::thread::hardware_concurrency(), [this] {_graphs.local();}});
@@ -162,21 +163,21 @@ MKLDNNExecNetwork::MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network
     // Save all MemoryLayer data tensors. Will use insight about mechanics
     // of MemoryLayer implementation. It uses output edge of MemoryLayer
     // producer as storage for tensor to keep it between infer calls.
-    if (_graphs.size() == 1) {
-        for (auto &node : _graphs.begin()->get()->GetNodes()) {
-            if (node->getType() == MemoryInput) {
-                auto state_store = node->getChildEdgeAt(0)->getMemoryPtr();
-                auto state_name = node->getName();
-
-                // Remove suffix with pair ID. Internal information.
-                auto suffix_idx = state_name.find("/id=");
-                if (suffix_idx != std::string::npos)
-                    state_name = state_name.substr(0, suffix_idx);
-
-                memoryStates.emplace_back(new MKLDNNMemoryState(state_name, state_store));
-            }
-        }
-    }
+//    if (_graphs.size() == 1) {
+//        for (auto &node : _graphs.begin()->begin()->second->GetNodes()) {
+//            if (node->getType() == MemoryInput) {
+//                auto state_store = node->getChildEdgeAt(0)->getMemoryPtr();
+//                auto state_name = node->getName();
+//
+//                // Remove suffix with pair ID. Internal information.
+//                auto suffix_idx = state_name.find("/id=");
+//                if (suffix_idx != std::string::npos)
+//                    state_name = state_name.substr(0, suffix_idx);
+//
+//                memoryStates.emplace_back(new MKLDNNMemoryState(state_name, state_store));
+//            }
+//        }
+//    }
 }
 
 void MKLDNNExecNetwork::setProperty(const std::map<std::string, std::string> &properties) {
@@ -184,9 +185,9 @@ void MKLDNNExecNetwork::setProperty(const std::map<std::string, std::string> &pr
         std::lock_guard<std::mutex> lock{_cfgMutex};
         _cfg.readProperties(properties);
     }
-    for (auto g : _graphs) {
-        g->setProperty(properties);
-    }
+    for (auto g : _graphs)
+        for (auto s : g)
+                s.second->setProperty(properties);
 }
 
 void MKLDNNExecNetwork::CreateInferRequest(InferenceEngine::IInferRequest::Ptr &asyncRequest) {
@@ -203,13 +204,13 @@ void MKLDNNExecNetwork::GetExecGraphInfo(InferenceEngine::ICNNNetwork::Ptr &grap
     if (_graphs.size() == 0)
         THROW_IE_EXCEPTION << "No graph was found";
 
-    graphPtr = _graphs.begin()->get()->dump();
+    graphPtr = _graphs.begin()->begin()->second->dump();
 }
 
 void MKLDNNExecNetwork::GetConfig(const std::string &name, Parameter &result, ResponseDesc *resp) const {
     if (_graphs.size() == 0)
         THROW_IE_EXCEPTION << "No graph was found";
-    Config engConfig = _graphs.begin()->get()->getProperty();
+    Config engConfig = _graphs.begin()->begin()->second->getProperty();
     auto option = engConfig._config.find(name);
     if (option != engConfig._config.end()) {
         result = option->second;
@@ -223,9 +224,9 @@ void MKLDNNExecNetwork::GetMetric(const std::string &name, Parameter &result, Re
         THROW_IE_EXCEPTION << "No graph was found";
 
     if (name == METRIC_KEY(NETWORK_NAME)) {
-        if (_graphs.begin()->get()->dump() == nullptr)
+        if (_graphs.begin()->begin()->second->dump() == nullptr)
             THROW_IE_EXCEPTION << "Invalid graph dump";
-        result = IE_SET_METRIC(NETWORK_NAME, _graphs.begin()->get()->dump()->getName());
+        result = IE_SET_METRIC(NETWORK_NAME, _graphs.begin()->begin()->second->dump()->getName());
     } else if (name == METRIC_KEY(SUPPORTED_METRICS)) {
         std::vector<std::string> metrics;
         metrics.push_back(METRIC_KEY(NETWORK_NAME));
@@ -235,12 +236,12 @@ void MKLDNNExecNetwork::GetMetric(const std::string &name, Parameter &result, Re
         result = IE_SET_METRIC(SUPPORTED_METRICS, metrics);
     } else if (name == METRIC_KEY(SUPPORTED_CONFIG_KEYS)) {
         std::vector<std::string> configKeys;
-        for (auto && key : _graphs.begin()->get()->getProperty()._config) {
+        for (auto && key : _graphs.begin()->begin()->second->getProperty()._config) {
             configKeys.push_back(key.first);
         }
         result = IE_SET_METRIC(SUPPORTED_CONFIG_KEYS, configKeys);
     } else if (name == METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS)) {
-        Config engConfig = _graphs.begin()->get()->getProperty();
+        Config engConfig = _graphs.begin()->begin()->second->getProperty();
         auto option = engConfig._config.find(CONFIG_KEY(CPU_THROUGHPUT_STREAMS));
         IE_ASSERT(option != engConfig._config.end());
         auto streams = std::stoi(option->second);

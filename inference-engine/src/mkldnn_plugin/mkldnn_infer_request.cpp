@@ -24,7 +24,7 @@ MKLDNNPlugin::MKLDNNInferRequest::MKLDNNInferRequest(InferenceEngine::InputsData
 
     if (execNetwork->_graphs.size() == 0)
         THROW_IE_EXCEPTION << "No graph was found";
-    graph = execNetwork->_graphs.begin()->get();
+    graph = (*execNetwork->_graphs.begin()).begin()->second.get();
     for (const auto& it : _networkInputs) {
         InferenceEngine::Blob::Ptr blob;
         MKLDNNInferRequest::GetBlob(it.first.c_str(), blob);
@@ -79,7 +79,7 @@ void copyToFloat(float* dst, const InferenceEngine::Blob* src) {
 
 void MKLDNNPlugin::MKLDNNInferRequest::InferImpl() {
     IE_PROFILING_AUTO_SCOPE_TASK(profilingTask)
-    graph = execNetwork->_graphs.local().get();
+    graph = execNetwork->_graphs.local().begin()->second.get();
     {
         execDataPreprocessing(_inputs);
 

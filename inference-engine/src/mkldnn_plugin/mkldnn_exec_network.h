@@ -44,7 +44,7 @@ public:
 
     std::vector<InferenceEngine::IMemoryStateInternal::Ptr> QueryState() override;
 
-    InferenceEngine::ThreadLocal<MKLDNNGraph::Ptr>  _graphs;
+    InferenceEngine::ThreadLocal<std::map<int, MKLDNNGraph::Ptr> >  _graphs;
 
 protected:
     friend class MKLDNNInferRequest;

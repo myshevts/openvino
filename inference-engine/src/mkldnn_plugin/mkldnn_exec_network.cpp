@@ -154,7 +154,7 @@ MKLDNNExecNetwork::MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network
             numaNode = streamExecutor->GetNumaNodeId();
         }
         graph->CreateGraph(static_cast<ICNNNetwork&>(*localNetwork), extensionManager, numaNodesWeights[numaNode]);
-        std::map<int, MKLDNNGraph::Ptr> m { {0, graph} };
+        SequenceGraphs m { {0, graph} };
         return m;
     }};
 

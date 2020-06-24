@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 namespace MKLDNNPlugin {
+typedef std::map<int, MKLDNNGraph::Ptr, std::greater<int>> SequenceGraphs;
 
 class MKLDNNExecNetwork: public InferenceEngine::ExecutableNetworkThreadSafeDefault {
 public:
@@ -44,7 +45,7 @@ public:
 
     std::vector<InferenceEngine::IMemoryStateInternal::Ptr> QueryState() override;
 
-    InferenceEngine::ThreadLocal<std::map<int, MKLDNNGraph::Ptr> >  _graphs;
+    InferenceEngine::ThreadLocal<SequenceGraphs> _graphs;
 
 protected:
     friend class MKLDNNInferRequest;

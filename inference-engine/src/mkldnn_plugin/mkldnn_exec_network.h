@@ -19,6 +19,7 @@
 
 namespace MKLDNNPlugin {
 typedef std::map<int, MKLDNNGraph::Ptr, std::greater<int>> SequenceGraphs;
+typedef std::map<int, InferenceEngine::CNNNetwork> ReshapedCNNNetworks;
 
 class MKLDNNExecNetwork: public InferenceEngine::ExecutableNetworkThreadSafeDefault {
 public:
@@ -30,7 +31,7 @@ public:
 
     void CreateInferRequest(InferenceEngine::IInferRequest::Ptr &asyncRequest) override;
 
-    MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network, const Config &cfg,
+    MKLDNNExecNetwork(ReshapedCNNNetworks, const Config &cfg,
                       const MKLDNNExtensionManager::Ptr &extMgr, NumaNodesWeights &weightsSharing);
 
     ~MKLDNNExecNetwork() override = default;

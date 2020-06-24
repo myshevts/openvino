@@ -36,14 +36,16 @@ MKLDNNExecNetwork::CreateInferRequestImpl(InferenceEngine::InputsDataMap network
     return std::make_shared<MKLDNNInferRequest>(networkInputs, networkOutputs, std::static_pointer_cast<MKLDNNExecNetwork>(shared_from_this()));
 }
 
-MKLDNNExecNetwork::MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network,
+MKLDNNExecNetwork::MKLDNNExecNetwork(ReshapedCNNNetworks networks,
                                      const Config &cfg,
                                      const MKLDNNExtensionManager::Ptr& extMgr,
                                      NumaNodesWeights &numaNodesWeights) :
     InferenceEngine::ExecutableNetworkThreadSafeDefault{nullptr, nullptr},
     extensionManager(extMgr),
     _cfg{cfg},
-    _name{network.getName()} {
+    _name{networks.begin()->second.getName()} {
+    const InferenceEngine::ICNNNetwork &network =  networks.begin()->second;
+
     // we are cloning network if we have statistics and we can transform network.
     _clonedNetwork = cloneNet(network);
 

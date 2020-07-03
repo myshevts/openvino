@@ -758,9 +758,9 @@ void MKLDNNGraph::PullOutputData(BlobMap &out) {
             ext_blob->allocate();
         }
 
-        if (ext_blob->byteSize() != intr_blob.GetSize())
-            THROW_IE_EXCEPTION << "Output blob size is not equal network output size ("
-                               << ext_blob->size() << "!=" << intr_blob.GetSize()/sizeof(float) << ").";
+//        if (ext_blob->byteSize() != intr_blob.GetSize())
+//            THROW_IE_EXCEPTION << "Output blob size is not equal network output size ("
+//                               << ext_blob->size() << "!=" << intr_blob.GetSize()/sizeof(float) << ").";
 
         void *ext_blob_ptr = ext_blob->buffer();
         void *intr_blob_ptr = intr_blob.GetData();
@@ -776,6 +776,8 @@ void MKLDNNGraph::PullOutputData(BlobMap &out) {
         size_t size_to_copy = intr_blob.GetSize() * MB_to_process / MB;
 
         ie_memcpy(ext_blob_ptr, ext_blob->byteSize(), intr_blob_ptr, size_to_copy);
+        if (ext_blob->byteSize() > intr_blob.GetSize())
+            memset((unsigned char*)ext_blob_ptr + size_to_copy, 0, ext_blob->byteSize() - intr_blob.GetSize());
     }
 }
 

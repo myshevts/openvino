@@ -18,8 +18,9 @@
 #include <unordered_map>
 
 namespace MKLDNNPlugin {
-typedef std::map<int, MKLDNNGraph::Ptr, std::greater<int>> SequenceGraphs;
-typedef std::map<int, InferenceEngine::CNNNetwork> ReshapedCNNNetworks;
+typedef std::less<int> sorting_order;
+typedef std::map<int, MKLDNNGraph::Ptr, sorting_order> SequenceGraphs;
+typedef std::map<int, InferenceEngine::CNNNetwork, sorting_order> ReshapedCNNNetworks;
 
 class MKLDNNExecNetwork: public InferenceEngine::ExecutableNetworkThreadSafeDefault {
 public:
@@ -52,7 +53,7 @@ protected:
     friend class MKLDNNInferRequest;
     MKLDNNExtensionManager::Ptr extensionManager;
     std::vector<InferenceEngine::IMemoryStateInternal::Ptr> memoryStates;
-    InferenceEngine::details::CNNNetworkImplPtr _clonedNetwork;
+    // InferenceEngine::details::CNNNetworkImplPtr _clonedNetwork;
     std::mutex                                  _cfgMutex;
     Config                                      _cfg;
     std::atomic_int                             _numRequests = {0};

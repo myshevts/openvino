@@ -85,13 +85,14 @@ Engine::LoadExeNetworkImpl(const InferenceEngine::ICNNNetwork &network, const st
     ReshapedCNNNetworks reshapedNetworks;
 
     int seq = shapes.at(inputInfo.cbegin()->first)[1];
-    while (seq >= 128) {
-        for (const InputsDataMap::value_type &item : inputInfo)
-            shapes[item.first][1] = seq;
-
+    do {
         CNNNetwork clonedNetwork(cloneNetwork(network));
-        clonedNetwork.reshape(shapes);
-
+        if (conf.dynamicSequence) {
+            for (const InputsDataMap::value_type &item : inputInfo)
+                shapes[item.first][1] = seq;
+            std::cout << "Reshaped network by sequence to  " << seq << std::endl;
+            clonedNetwork.reshape(shapes);
+        }
         if (clonedNetwork.getFunction()) {
             const auto transformations_callback = [](const std::shared_ptr<const ::ngraph::Node> &node) -> bool {
                 // DepthToSpace node implementation supports only equal input/output tensors with rank <= 5
@@ -136,7 +137,8 @@ Engine::LoadExeNetworkImpl(const InferenceEngine::ICNNNetwork &network, const st
         }
         reshapedNetworks[seq] = clonedNetwork;
         seq -= 64;
-    }
+    } while (conf.dynamicSequence && seq >=conf.dynamicSequence);
+
     return std::make_shared<MKLDNNExecNetwork>(reshapedNetworks, conf, extensionManager, weightsSharing);
 }
 

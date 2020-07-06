@@ -38,6 +38,11 @@ void Config::readProperties(const std::map<std::string, std::string> &prop) {
             // zero and any negative value will be treated
             // as default batch size
             batchLimit = std::max(val_i, 0);
+        } else if (key == PluginConfigParams::KEY_CPU_DYNAMIC_SEQUENCE) {
+            int val_i = std::stoi(val);
+            // zero and any negative value will be treated
+            // as default sequence size
+            dynamicSequence = std::max(val_i, 0);
         } else if (key == PluginConfigParams::KEY_PERF_COUNT) {
             if (val == PluginConfigParams::YES) collectPerfCounters = true;
             else if (val == PluginConfigParams::NO) collectPerfCounters = false;

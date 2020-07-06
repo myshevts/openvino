@@ -80,20 +80,26 @@ void copyToFloat(float* dst, const InferenceEngine::Blob* src) {
 
 void MKLDNNPlugin::MKLDNNInferRequest::InferImpl() {
     IE_PROFILING_AUTO_SCOPE_TASK(profilingTask)
+    const bool dyn_sequence = execNetwork->_graphs.local().size() > 1;
     auto dims = _inputs.cbegin()->second->getTensorDesc().getDims();
-    int* ptr = _inputs.cbegin()->second->buffer();
-    auto sz = _inputs.cbegin()->second->size();
-    const int first_non_zero = std::distance(ptr,
-            std::find_if(ptr, ptr+sz, [](int x) { return x == 0; }));
-    std::cout << "Last non-zero : " << first_non_zero << std::endl;
-    const int actual_seq = execNetwork->_graphs.local().lower_bound(first_non_zero)->first;
-    std::cout << "Actual Seq : " << actual_seq << std::endl;
-    graph = execNetwork->_graphs.local()[actual_seq].get();
-    // todo: batch
-    dims[1] = actual_seq;
+    if (dyn_sequence) {
+        // graph per sequence
+        const int *ptr = _inputs.cbegin()->second->buffer().as<int *>();
+        auto sz = _inputs.cbegin()->second->size();
+        const int size_non_zero = std::distance(ptr,
+                                                std::find_if(ptr, ptr + sz, [](int x) { return x == 0; }));
+        const int actual_seq = execNetwork->_graphs.local().lower_bound(size_non_zero)->first;
+        // std::cout << "Last non-zero : " << size_non_zero << ", Actual Seq : " << actual_seq << std::endl;
+        graph = execNetwork->_graphs.local()[actual_seq].get();
+        dims[1] = actual_seq;
+    } else {
+        graph = execNetwork->_graphs.local().begin()->second.get();
+    }
+
     {
-        // execDataPreprocessing(_inputs);
-        // changeDefaultPtr();
+        execDataPreprocessing(_inputs);
+        if (!dyn_sequence)
+            changeDefaultPtr();
 
         // need to retain converted blobs until infer finish
         std::vector<InferenceEngine::Blob::Ptr> convertedInputs;
@@ -111,13 +117,16 @@ void MKLDNNPlugin::MKLDNNInferRequest::InferImpl() {
                     pushInput<float>(input.first, input.second);
                     break;
                 case InferenceEngine::Precision::I32:
-                    iconv = InferenceEngine::make_shared_blob<int32_t>({InferenceEngine::Precision::I32,
-                                                                      dims,
-                                                                      input.second->getTensorDesc().getLayout()},
-                                                                      input.second->buffer());
-                    convertedInputs.push_back(iconv);
-
-                    pushInput<int32_t>(input.first, iconv);
+                    if (dyn_sequence) {
+                        iconv = InferenceEngine::make_shared_blob<int32_t>({InferenceEngine::Precision::I32,
+                                                                            dims,
+                                                                            input.second->getTensorDesc().getLayout()},
+                                                                           input.second->buffer());
+                        convertedInputs.push_back(iconv);
+                        pushInput<int32_t>(input.first, iconv);
+                    } else {
+                        pushInput<int32_t>(input.first, input.second);
+                    }
                     break;
                 case InferenceEngine::Precision::I8:
                     pushInput<int8_t>(input.first, input.second);

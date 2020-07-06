@@ -192,6 +192,11 @@ DECLARE_CONFIG_VALUE(NO);
 DECLARE_CONFIG_KEY(CPU_THREADS_NUM);
 
 /**
+ * @brief Enable dynamic sequence recognition for 1D inputs for the CPU
+ */
+DECLARE_CONFIG_KEY(CPU_DYNAMIC_SEQUENCE);
+
+/**
  * @brief The name for setting CPU affinity per thread option.
  *
  * It is passed to Core::SetConfig(), this option should be used with values:

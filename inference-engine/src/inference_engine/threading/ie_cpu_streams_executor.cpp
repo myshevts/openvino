@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <thread>
 #include <queue>
+#include <pthread.h>
 #include <atomic>
 #include <climits>
 #include <cassert>
@@ -150,8 +151,18 @@ struct CPUStreamsExecutor::Impl {
                              numaNodes.size()),
                     std::back_inserter(_usedNumaNodes));
         for (auto streamId = 0; streamId < _config._streams; ++streamId) {
-            _threads.emplace_back([this, streamId] {
+            _threads.emplace_back([this, streamId, config] {
                 annotateSetThreadName((_config._name + "_" + std::to_string(streamId)).c_str());
+                if (config._high_pri) {
+                    sched_param sch;
+                    int policy;
+                    pthread_getschedparam(pthread_self(), &policy, &sch);
+                    std::cout << "Boosting priority from " << sch.sched_priority << "and " << policy << "policy" << std::endl;
+                    sch.sched_priority = 99;
+                    if (!pthread_setschedparam(pthread_self(), SCHED_FIFO, &sch))
+                        std::cout << "FAILED Boosting !!!" << std::endl;
+                }
+
                 for (bool stopped = false; !stopped;) {
                     Task task;
                     {

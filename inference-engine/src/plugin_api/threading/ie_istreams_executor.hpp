@@ -75,6 +75,7 @@ public:
         int                _threadBindingStep       = 1;  //!< In case of @ref CORES binding offset type thread binded to cores with defined step
         int                _threadBindingOffset     = 0;  //!< In case of @ref CORES binding offset type thread binded to cores starting from offset
         int                _threads                 = 0;  //!< Number of threads distributed between streams. Reserved. Should not be used.
+        bool               _high_pri                = false;
 
         /**
          * @brief      A constructor with arguments
@@ -94,14 +95,16 @@ public:
             ThreadBindingType  threadBindingType       = ThreadBindingType::NONE,
             int                threadBindingStep       = 1,
             int                threadBindingOffset     = 0,
-            int                threads                 = 0) :
+            int                threads                 = 0,
+            bool               high_pri                = false) :
         _name{name},
         _streams{streams},
         _threadsPerStream{threadsPerStream},
         _threadBindingType{threadBindingType},
         _threadBindingStep{threadBindingStep},
         _threadBindingOffset{threadBindingOffset},
-        _threads{threads} {
+        _threads{threads},
+        _high_pri (high_pri){
         }
     };
 

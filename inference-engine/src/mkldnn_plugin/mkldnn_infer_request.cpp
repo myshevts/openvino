@@ -38,6 +38,7 @@ MKLDNNPlugin::MKLDNNInferRequest::MKLDNNInferRequest(InferenceEngine::InputsData
 
 MKLDNNPlugin::MKLDNNInferRequest::~MKLDNNInferRequest() {
     --(execNetwork->_numRequests);
+     std::cout << "#requests by CPU: " << num << std::endl;
 }
 
 template <typename T>
@@ -78,6 +79,8 @@ void copyToFloat(float* dst, const InferenceEngine::Blob* src) {
 }  // namespace
 
 void MKLDNNPlugin::MKLDNNInferRequest::InferImpl() {
+   num++;
+
     IE_PROFILING_AUTO_SCOPE_TASK(profilingTask)
     graph = execNetwork->_graphs.local().get();
     {

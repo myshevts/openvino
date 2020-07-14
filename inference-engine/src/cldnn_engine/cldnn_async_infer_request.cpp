@@ -12,9 +12,11 @@ CLDNNPlugin::CLDNNAsyncInferRequest::CLDNNAsyncInferRequest(const InferenceEngin
         { }
 
 void CLDNNPlugin::CLDNNAsyncInferRequest::Infer_ThreadUnsafe() {
+    num_r++;
     InferUsingAsync();
 }
 
 CLDNNPlugin::CLDNNAsyncInferRequest::~CLDNNAsyncInferRequest() {
     StopAndWait();
+    std::cout << "#requests by GPU: " << num_r << std::endl;
 }

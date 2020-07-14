@@ -8,6 +8,8 @@
 #include <memory>
 #include <string>
 #include <map>
+#include <atomic>
+
 #include <cpp_interfaces/impl/ie_infer_request_internal.hpp>
 
 namespace MKLDNNPlugin {
@@ -51,5 +53,6 @@ private:
     MKLDNNGraph*                        graph = nullptr;
     std::map<std::string, void*>        externalPtr;
     InferenceEngine::ProfilingTask      profilingTask;
+    std::atomic<int> num = 0;
 };
 }  // namespace MKLDNNPlugin

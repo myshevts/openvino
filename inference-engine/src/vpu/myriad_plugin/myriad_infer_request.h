@@ -34,6 +34,8 @@ class MyriadInferRequest : public InferenceEngine::InferRequestInternal {
     GraphDesc _graphDesc;
     std::vector<uint8_t> resultBuffer;
     std::vector<uint8_t> inputBuffer;
+    std::atomic<int> num = 0;
+
 
 public:
     typedef std::shared_ptr<MyriadInferRequest> Ptr;
@@ -47,6 +49,9 @@ public:
                                 const MyriadConfig &myriadConfig,
                                 const Logger::Ptr &log,
                                 const MyriadExecutorPtr &executor);
+    virtual  ~MyriadInferRequest() {
+        std::cout << "#requests by MYRIAD: " << num << std::endl;
+    }
 
     void InferImpl() override;
     void InferAsync();

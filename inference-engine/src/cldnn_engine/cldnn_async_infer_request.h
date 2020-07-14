@@ -20,6 +20,7 @@ public:
     void Infer_ThreadUnsafe() override;
 
     ~CLDNNAsyncInferRequest() override;
+    std::atomic<int> num_r = 0;
 };
 
 }  // namespace CLDNNPlugin

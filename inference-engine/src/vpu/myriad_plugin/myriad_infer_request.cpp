@@ -87,6 +87,7 @@ MyriadInferRequest::MyriadInferRequest(GraphDesc &graphDesc,
 
 void MyriadInferRequest::InferImpl() {
     InferAsync();
+    num++;
     GetResult();
 }
 

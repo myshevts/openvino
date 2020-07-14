@@ -153,6 +153,7 @@ MultiDeviceExecutableNetwork::MultiDeviceExecutableNetwork(const DeviceMap<Infer
     for (auto&& networkValue : _networksPerDevice) {
         auto& device  = networkValue.first;
         auto& network = networkValue.second;
+        _statsPerDevice.insert({device, 0});
 
         auto itNumRequests = std::find_if(_devicePriorities.cbegin(), _devicePriorities.cend(),
                 [&device](const DeviceInformation& d){ return d.deviceName == device;});
@@ -204,6 +205,7 @@ void MultiDeviceExecutableNetwork::ScheduleToWorkerInferRequest() {
             IdleGuard idleGuard{workerRequestPtr, idleWorkerRequests};
             Task inferPipelineTask;
             if (_inferPipelineTasks.try_pop(inferPipelineTask)) {
+                _statsPerDevice[device.first]++;
                 _thisWorkerInferRequest = workerRequestPtr;
                 inferPipelineTask();
                 idleGuard.Release();
@@ -230,6 +232,13 @@ MultiDeviceExecutableNetwork::~MultiDeviceExecutableNetwork() {
      *       But AsyncInferRequest destructor should waits for all asynchronous tasks that are used by the request
      */
     _workerRequests.clear();
+    int sum = 0;
+    std::cout << std::endl;
+    for (auto device : _statsPerDevice) {
+        std::cout << device.first << " executed " << device.second << " requests" << std::endl;
+        sum += device.second;
+    }
+    std::cout << std::endl <<  "ALL executed" << sum << " requests" << std::endl;
 }
 
 InferenceEngine::InferRequestInternal::Ptr MultiDeviceExecutableNetwork::CreateInferRequestImpl(InferenceEngine::InputsDataMap networkInputs,

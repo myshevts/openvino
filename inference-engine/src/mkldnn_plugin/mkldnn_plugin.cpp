@@ -136,7 +136,7 @@ Engine::LoadExeNetworkImpl(const InferenceEngine::ICNNNetwork &network, const st
             transformator.fullTrim();
         }
         reshapedNetworks[seq] = clonedNetwork;
-        seq -= 64;
+        seq -= 128;
     } while (conf.dynamicSequence && seq >=conf.dynamicSequence);
 
     return std::make_shared<MKLDNNExecNetwork>(reshapedNetworks, conf, extensionManager, weightsSharing);

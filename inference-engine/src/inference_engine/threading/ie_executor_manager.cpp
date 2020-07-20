@@ -35,7 +35,8 @@ IStreamsExecutor::Ptr ExecutorManagerImpl::getIdleCPUStreamsExecutor(const IStre
             executorConfig._threadsPerStream == config._threadsPerStream &&
             executorConfig._threadBindingType == config._threadBindingType &&
             executorConfig._threadBindingStep == config._threadBindingStep &&
-            executorConfig._threadBindingOffset == config._threadBindingOffset)
+            executorConfig._threadBindingOffset == config._threadBindingOffset &&
+            executorConfig._priority == config._priority)
             return executor;
     }
     auto newExec = std::make_shared<CPUStreamsExecutor>(config);

@@ -224,7 +224,7 @@ macro(ie_add_sample)
     target_include_directories(${IE_SAMPLE_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common")
 
     target_link_libraries(${IE_SAMPLE_NAME} PRIVATE ${OpenCV_LIBRARIES} ${InferenceEngine_LIBRARIES}
-                                                    ${IE_SAMPLE_DEPENDENCIES} gflags)
+                                                    ${IE_SAMPLE_DEPENDENCIES} gflags pdh)
 
     # create global target with all samples / demo apps
     if(NOT TARGET ie_samples)

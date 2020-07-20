@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
                 devices = parseDevices(FLAGS_d);
 
             for (auto device : devices) {
-                multi_devices.insert({device, 0});
+                multi_devices.insert({device, 0.f});
                 curr_devices.push_back(device);
                 multi+= device;
                 multi += ((device == *devices.rbegin()) ? "" : ",");
@@ -540,8 +540,8 @@ int main(int argc, char *argv[]) {
             iteration++;
             if ((iteration % update) == 0) {
                 inferRequestsQueue.waitAll();
-                float totalDuration = inferRequestsQueue.getDurationInMilliseconds();
-                float fps = batchSize * 1000.0 * iteration / totalDuration;
+                float totalDuration = (float)inferRequestsQueue.getDurationInMilliseconds();
+                float fps = (float)batchSize * 1000.0f * iteration / totalDuration;
                 max_fps = std::max(max_fps, fps);
                 if (curr_devices.size() ==1) {
                     multi_devices[curr_devices[0]] = std::max(multi_devices[curr_devices[0]], fps);
@@ -601,12 +601,12 @@ int main(int argc, char *argv[]) {
                         break;
                     case 'q':
                     case 'Q':
-                        update *= 1.1;
+                        // update *= 1.1f;
                         break;
                     case 'p':
                     case 'P':
-                        update /= 1.1;
-                        update = std::max(update, 1);
+                        // update /= 1.1f;
+                        // update = std::max(update, 1);
                         break;
                     case 27: // Esc
                         stop = true;
@@ -615,7 +615,7 @@ int main(int argc, char *argv[]) {
             }
         }
         // wait the latest inference executions
-        inferRequestsQueue.waitAll();q
+        inferRequestsQueue.waitAll();
         // ----------------- 11. Dumping statistics report -------------------------------------------------------------
         next_step();
 

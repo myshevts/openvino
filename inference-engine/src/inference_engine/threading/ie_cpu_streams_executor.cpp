@@ -13,6 +13,8 @@
 #include <climits>
 #include <cassert>
 #include <utility>
+#include <windows.h>
+#include <strsafe.h>
 #include "threading/ie_thread_local.hpp"
 #include "ie_profiling.hpp"
 #include "ie_parallel.hpp"
@@ -23,9 +25,73 @@
 #include "threading/ie_cpu_streams_executor.hpp"
 
 namespace InferenceEngine {
+static std::map<IStreamsExecutor::NetworkPriority, int> sThreadPriorityMap = {
+                { IStreamsExecutor::NetworkPriority::PRIORITY_BACKGROUND   , THREAD_MODE_BACKGROUND_BEGIN},
+                { IStreamsExecutor::NetworkPriority::PRIORITY_LOWEST       , THREAD_PRIORITY_LOWEST},
+                { IStreamsExecutor::NetworkPriority::PRIORITY_BELOW_NORMAL , THREAD_PRIORITY_BELOW_NORMAL},
+                { IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL       , THREAD_PRIORITY_NORMAL},
+                { IStreamsExecutor::NetworkPriority::PRIORITY_ABOVE_NORMAL , THREAD_PRIORITY_ABOVE_NORMAL},
+                { IStreamsExecutor::NetworkPriority::PRIORITY_HIGHEST      , THREAD_PRIORITY_HIGHEST},
+                { IStreamsExecutor::NetworkPriority::PRIORITY_TIME_CRITICAL, THREAD_PRIORITY_TIME_CRITICAL},
+};
+
+
+void ErrorExit(LPTSTR lpszFunction)
+{
+    // Retrieve the system error message for the last-error code
+
+    LPVOID lpMsgBuf;
+    LPVOID lpDisplayBuf;
+    DWORD dw = GetLastError();
+
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        dw,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR)&lpMsgBuf,
+        0, NULL);
+
+    // Display the error message and exit the process
+
+    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,
+        (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)lpszFunction) + 40) * sizeof(TCHAR));
+    StringCchPrintf((LPTSTR)lpDisplayBuf,
+        LocalSize(lpDisplayBuf) / sizeof(TCHAR),
+        TEXT("%s failed with error %d: %s"),
+        lpszFunction, dw, lpMsgBuf);
+    MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
+
+    LocalFree(lpMsgBuf);
+    LocalFree(lpDisplayBuf);
+    // ExitProcess(dw);
+}
 struct CPUStreamsExecutor::Impl {
     struct Stream {
 #if IE_THREAD == IE_THREAD_TBB || IE_THREAD == IE_THREAD_TBB_AUTO
+        struct PriorityObserver : public tbb::task_scheduler_observer {
+            IStreamsExecutor::NetworkPriority _priority = IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL;
+
+            PriorityObserver(tbb::task_arena& arena, IStreamsExecutor::NetworkPriority pri) :
+                tbb::task_scheduler_observer(arena), _priority(pri) {
+            }
+            void on_scheduler_entry(bool) override {
+                auto pri = sThreadPriorityMap[_priority];
+                auto cur_pri = GetThreadPriority(GetCurrentThread());
+                if (cur_pri != pri)
+                    if (!SetThreadPriority(GetCurrentThread(), pri))
+                        ErrorExit("SetThreadPriority");
+                    //else
+                    //    std::cout << "OK SetThreadPriority" << std::endl;
+            }
+            void on_scheduler_exit(bool) override {
+                // todo
+            }
+            ~PriorityObserver() override = default;
+        };
+
         struct Observer: public tbb::task_scheduler_observer {
             CpuSet  _mask;
             int     _ncpus                  = 0;
@@ -71,10 +137,14 @@ struct CPUStreamsExecutor::Impl {
             auto concurrency = (0 == _impl->_config._threadsPerStream) ? tbb::task_arena::automatic : _impl->_config._threadsPerStream;
             if (ThreadBindingType::NUMA == _impl->_config._threadBindingType) {
                 _taskArena.reset(new tbb::task_arena{tbb::task_arena::constraints{_numaNodeId, concurrency}});
+                if (IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL != _impl->_config._priority) {
+                    _observer.reset(new PriorityObserver{ *_taskArena, _impl->_config._priority });
+                    _observer->observe(true);
+                }
             } else if ((0 != _impl->_config._threadsPerStream) || (ThreadBindingType::CORES == _impl->_config._threadBindingType)) {
                 _taskArena.reset(new tbb::task_arena{concurrency});
                 if (ThreadBindingType::CORES == _impl->_config._threadBindingType) {
-                    CpuSet processMask;
+                     CpuSet processMask;
                     int    ncpus = 0;
                     std::tie(processMask, ncpus) = GetProcessMask();
                     if (nullptr != processMask) {
@@ -134,7 +204,7 @@ struct CPUStreamsExecutor::Impl {
         std::queue<Task> _taskQueue;
 #if IE_THREAD == IE_THREAD_TBB || IE_THREAD == IE_THREAD_TBB_AUTO
         std::unique_ptr<tbb::task_arena>    _taskArena;
-        std::unique_ptr<Observer>           _observer;
+        std::unique_ptr<tbb::task_scheduler_observer> _observer;
 #endif
     };
 
@@ -151,6 +221,14 @@ struct CPUStreamsExecutor::Impl {
                     std::back_inserter(_usedNumaNodes));
         for (auto streamId = 0; streamId < _config._streams; ++streamId) {
             _threads.emplace_back([this, streamId] {
+                auto pri = sThreadPriorityMap[_config._priority];
+                std::stringstream s;
+                s << "Setting the " << _config._name << "'s thread to the priority " << pri << std::endl;
+                std::cout << s.str();
+                if (pri != GetThreadPriority(GetCurrentThread()))
+                    if (!SetThreadPriority(GetCurrentThread(), pri))
+                        ErrorExit("SetThreadPriority Stream");
+
                 annotateSetThreadName((_config._name + "_" + std::to_string(streamId)).c_str());
                 for (bool stopped = false; !stopped;) {
                     Task task;

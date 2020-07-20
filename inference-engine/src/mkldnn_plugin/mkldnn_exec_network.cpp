@@ -125,6 +125,7 @@ MKLDNNExecNetwork::MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network
                                                 ? std::max(1, threads/streamExecutorConfig._streams)
                                                 : threads;
         streamExecutorConfig._name = "CPUStreamsExecutor";
+        streamExecutorConfig._priority = IStreamsExecutor::NetworkPriority::PRIORITY_BACKGROUND;
         _taskExecutor = ExecutorManager::getInstance()->getIdleCPUStreamsExecutor(streamExecutorConfig);
     }
     if (0 != cfg.streamExecutorConfig._streams) {

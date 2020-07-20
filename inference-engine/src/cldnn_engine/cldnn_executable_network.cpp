@@ -41,7 +41,9 @@ CLDNNExecNetwork::CLDNNExecNetwork(InferenceEngine::ICNNNetwork &network, Remote
     InferenceEngine::ExecutableNetworkThreadSafeDefault{[&]()->InferenceEngine::ITaskExecutor::Ptr {
         if (config.throughput_streams > 1) {
             return std::make_shared<InferenceEngine::CPUStreamsExecutor>(
-                IStreamsExecutor::Config{"CLDNNPlugin executor", config.throughput_streams});
+                IStreamsExecutor::Config{"CLDNNPlugin executor", config.throughput_streams, 0,
+                IStreamsExecutor::ThreadBindingType::NONE, 1, 0, 0,
+                IStreamsExecutor::NetworkPriority::PRIORITY_HIGHEST});
         } else if (config.exclusiveAsyncRequests) {
             return ExecutorManager::getInstance()->getExecutor("GPU");
         } else {

@@ -43,7 +43,18 @@ public:
         CORES,   //!< Bind threads to cores
         NUMA     //!< Bind threads to NUMA nodes
     };
-
+    /**
+     * @brief Defines network priority
+     */
+    enum NetworkPriority{
+        PRIORITY_BACKGROUND,
+        PRIORITY_LOWEST,
+        PRIORITY_BELOW_NORMAL,
+        PRIORITY_NORMAL,
+        PRIORITY_ABOVE_NORMAL,
+        PRIORITY_HIGHEST,
+        PRIORITY_TIME_CRITICAL
+    };
     /**
      * @brief Defines IStreamsExecutor configuration
      */
@@ -75,6 +86,8 @@ public:
         int                _threadBindingStep       = 1;  //!< In case of @ref CORES binding offset type thread binded to cores with defined step
         int                _threadBindingOffset     = 0;  //!< In case of @ref CORES binding offset type thread binded to cores starting from offset
         int                _threads                 = 0;  //!< Number of threads distributed between streams. Reserved. Should not be used.
+        NetworkPriority   _priority = NetworkPriority::PRIORITY_NORMAL;
+
 
         /**
          * @brief      A constructor with arguments
@@ -94,14 +107,16 @@ public:
             ThreadBindingType  threadBindingType       = ThreadBindingType::NONE,
             int                threadBindingStep       = 1,
             int                threadBindingOffset     = 0,
-            int                threads                 = 0) :
+            int                threads                 = 0,
+            NetworkPriority    priority = NetworkPriority::PRIORITY_NORMAL) :
         _name{name},
         _streams{streams},
         _threadsPerStream{threadsPerStream},
         _threadBindingType{threadBindingType},
         _threadBindingStep{threadBindingStep},
         _threadBindingOffset{threadBindingOffset},
-        _threads{threads} {
+        _threads{threads}, _priority(priority)
+        {
         }
     };
 

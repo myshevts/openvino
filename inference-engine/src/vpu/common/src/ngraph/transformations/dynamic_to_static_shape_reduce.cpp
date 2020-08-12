@@ -26,11 +26,11 @@ void dynamicToStaticShapeReduce(std::shared_ptr<ngraph::Node> target) {
                      target->get_friendly_name(), target->get_type_info());
 
 
-    const auto axes_const_node = ngraph::as_type_ptr<ngraph::opset3::Constant>(target->get_argument(1));
+    const auto axes_const_node = ngraph::as_type_ptr<ngraph::opset3::Constant>(target->input_value(1).get_node_shared_ptr());
     VPU_THROW_UNLESS(axes_const_node,
                      "dynamicToStaticShapeReduce transformation for {} of type {} expects {} as input with index {}, but it has {} node of type {} instead",
                      target->get_friendly_name(), target->get_type_info(), ngraph::opset3::Constant::type_info, 1,
-                     target->get_argument(1)->get_friendly_name(), target->get_argument(1)->get_type_info());
+                     target->input_value(1).get_node_shared_ptr()->get_friendly_name(), target->input_value(1).get_node_shared_ptr()->get_type_info());
 
     const auto axes = axes_const_node->cast_vector<int64_t>();
 
@@ -66,6 +66,9 @@ void dynamicToStaticShapeReduce(std::shared_ptr<ngraph::Node> target) {
                 ngraph::opset3::Constant::create(ngraph::element::i64, {1}, {0}));
     }
     const auto copied = target->clone_with_new_inputs(target->input_values());
-    ngraph::replace_node(target, std::make_shared<ngraph::vpu::op::DynamicShapeResolver>(copied, output_shape));
+
+    auto outDSR = std::make_shared<ngraph::vpu::op::DynamicShapeResolver>(copied, output_shape);
+    outDSR->set_friendly_name(target->get_friendly_name());
+    ngraph::replace_node(target, std::move(outDSR));
 }
 }  // namespace vpu

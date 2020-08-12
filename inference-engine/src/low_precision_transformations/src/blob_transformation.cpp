@@ -4,6 +4,7 @@
 
 #include "low_precision_transformations/blob_transformation.hpp"
 #include "low_precision_transformations/network_helper.hpp"
+#include <legacy/details/ie_cnn_network_tools.h>
 
 #include <algorithm>
 #include <vector>

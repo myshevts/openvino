@@ -15,6 +15,7 @@
 //*****************************************************************************
 
 #include "ngraph/op/gather.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/constant.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/gather.hpp"
@@ -92,12 +93,6 @@ void op::v0::Gather::validate_and_infer_types()
     }
 
     set_output_type(0, result_et, result_shape);
-}
-
-void op::v0::Gather::generate_adjoints(autodiff::Adjoints& /* adjoints */,
-                                       const OutputVector& /* deltas */)
-{
-    throw ngraph_error("Not yet implemented");
 }
 
 constexpr NodeTypeInfo op::v1::Gather::type_info;
@@ -199,12 +194,6 @@ int64_t op::v1::Gather::get_axis() const
     return axis;
 }
 
-void op::v1::Gather::generate_adjoints(autodiff::Adjoints& /* adjoints */,
-                                       const OutputVector& /* deltas */)
-{
-    throw ngraph_error("Not yet implemented");
-}
-
 shared_ptr<Node> op::v1::Gather::clone_with_new_inputs(const OutputVector& new_args) const
 {
     check_new_args_count(this, new_args);
@@ -276,29 +265,17 @@ namespace
 
         switch (out->get_element_type())
         {
-            TYPE_CASE(i8)(arg0, arg1, out, axis);
-            break;
-            TYPE_CASE(i16)(arg0, arg1, out, axis);
-            break;
             TYPE_CASE(i32)(arg0, arg1, out, axis);
             break;
             TYPE_CASE(i64)(arg0, arg1, out, axis);
-            break;
-            TYPE_CASE(u8)(arg0, arg1, out, axis);
-            break;
-            TYPE_CASE(u16)(arg0, arg1, out, axis);
             break;
             TYPE_CASE(u32)(arg0, arg1, out, axis);
             break;
             TYPE_CASE(u64)(arg0, arg1, out, axis);
             break;
-            TYPE_CASE(bf16)(arg0, arg1, out, axis);
-            break;
             TYPE_CASE(f16)(arg0, arg1, out, axis);
             break;
             TYPE_CASE(f32)(arg0, arg1, out, axis);
-            break;
-            TYPE_CASE(f64)(arg0, arg1, out, axis);
             break;
             TYPE_CASE(boolean)(arg0, arg1, out, axis);
             break;
@@ -308,13 +285,15 @@ namespace
     }
 }
 
-bool op::v0::Gather::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Gather::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Gather::evaluate");
     return evaluate_gather(inputs[0], inputs[1], outputs[0], get_axis());
 }
 
-bool op::v1::Gather::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v1::Gather::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v1::Gather::evaluate");
     int64_t axis = 0;
     switch (inputs[2]->get_element_type())
     {

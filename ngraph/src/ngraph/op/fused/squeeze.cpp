@@ -18,6 +18,7 @@
 #include <functional>
 #include <set>
 
+#include "ngraph/itt.hpp"
 #include "ngraph/op/constant.hpp"
 #include "ngraph/op/fused/squeeze.hpp"
 #include "ngraph/op/reshape.hpp"
@@ -112,7 +113,7 @@ bool ngraph::op::v0::Squeeze::visit_attributes(AttributeVisitor& visitor)
     return true;
 }
 
-NodeVector op::Squeeze::decompose_op() const
+OutputVector op::Squeeze::decompose_op() const
 {
     NODE_VALIDATION_CHECK(
         this,
@@ -185,29 +186,17 @@ namespace
         bool rc = true;
         switch (element_type)
         {
-            TYPE_CASE(i8)(arg0, out);
-            break;
-            TYPE_CASE(i16)(arg0, out);
-            break;
             TYPE_CASE(i32)(arg0, out);
             break;
             TYPE_CASE(i64)(arg0, out);
-            break;
-            TYPE_CASE(u8)(arg0, out);
-            break;
-            TYPE_CASE(u16)(arg0, out);
             break;
             TYPE_CASE(u32)(arg0, out);
             break;
             TYPE_CASE(u64)(arg0, out);
             break;
-            TYPE_CASE(bf16)(arg0, out);
-            break;
             TYPE_CASE(f16)(arg0, out);
             break;
             TYPE_CASE(f32)(arg0, out);
-            break;
-            TYPE_CASE(f64)(arg0, out);
             break;
         default: rc = false; break;
         }
@@ -215,7 +204,9 @@ namespace
     }
 }
 
-bool op::v0::Squeeze::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Squeeze::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Squeeze::evaluate");
     return evaluate_squeeze(inputs[0], inputs[1], outputs[0]);
 }

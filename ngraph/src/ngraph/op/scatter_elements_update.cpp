@@ -15,7 +15,9 @@
 //*****************************************************************************
 
 #include "ngraph/op/scatter_elements_update.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/constant.hpp"
+#include "ngraph/op/util/op_types.hpp"
 #include "ngraph/runtime/reference/scatter_elements_update.hpp"
 #include "ngraph/validation_util.hpp"
 
@@ -91,7 +93,7 @@ void op::v3::ScatterElementsUpdate::validate_and_infer_types()
                           " and: ",
                           updates_shape);
 
-    if (input_value(3).get_node_shared_ptr()->is_constant() && data_shape.rank().is_static())
+    if (ngraph::op::is_constant(input_value(3).get_node()) && data_shape.rank().is_static())
     {
         const auto axis_input = as_type_ptr<op::v0::Constant>(input_value(3).get_node_shared_ptr());
         auto axis = axis_input->cast_vector<int64_t>().at(0);
@@ -249,29 +251,17 @@ namespace
 
         switch (out->get_element_type())
         {
-            TYPE_CASE(i8)(arg0, arg1, arg2, arg3, out, normalized_axis);
-            break;
-            TYPE_CASE(i16)(arg0, arg1, arg2, arg3, out, normalized_axis);
-            break;
             TYPE_CASE(i32)(arg0, arg1, arg2, arg3, out, normalized_axis);
             break;
             TYPE_CASE(i64)(arg0, arg1, arg2, arg3, out, normalized_axis);
-            break;
-            TYPE_CASE(u8)(arg0, arg1, arg2, arg3, out, normalized_axis);
-            break;
-            TYPE_CASE(u16)(arg0, arg1, arg2, arg3, out, normalized_axis);
             break;
             TYPE_CASE(u32)(arg0, arg1, arg2, arg3, out, normalized_axis);
             break;
             TYPE_CASE(u64)(arg0, arg1, arg2, arg3, out, normalized_axis);
             break;
-            TYPE_CASE(bf16)(arg0, arg1, arg2, arg3, out, normalized_axis);
-            break;
             TYPE_CASE(f16)(arg0, arg1, arg2, arg3, out, normalized_axis);
             break;
             TYPE_CASE(f32)(arg0, arg1, arg2, arg3, out, normalized_axis);
-            break;
-            TYPE_CASE(f64)(arg0, arg1, arg2, arg3, out, normalized_axis);
             break;
         default: rc = false; break;
         }
@@ -280,8 +270,10 @@ namespace
 }
 
 bool op::v3::ScatterElementsUpdate::evaluate(const HostTensorVector& outputs,
-                                             const HostTensorVector& inputs)
+                                             const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v3::ScatterElementsUpdate::evaluate");
+
     int64_t axis = 0;
     switch (inputs[3]->get_element_type())
     {

@@ -15,6 +15,7 @@
 //*****************************************************************************
 
 #include "ngraph/op/xor.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/xor.hpp"
 
@@ -71,29 +72,17 @@ namespace
         {
             TYPE_CASE(boolean)(arg0, arg1, out, broadcast_spec);
             break;
-            TYPE_CASE(i8)(arg0, arg1, out, broadcast_spec);
-            break;
-            TYPE_CASE(i16)(arg0, arg1, out, broadcast_spec);
-            break;
             TYPE_CASE(i32)(arg0, arg1, out, broadcast_spec);
             break;
             TYPE_CASE(i64)(arg0, arg1, out, broadcast_spec);
-            break;
-            TYPE_CASE(u8)(arg0, arg1, out, broadcast_spec);
-            break;
-            TYPE_CASE(u16)(arg0, arg1, out, broadcast_spec);
             break;
             TYPE_CASE(u32)(arg0, arg1, out, broadcast_spec);
             break;
             TYPE_CASE(u64)(arg0, arg1, out, broadcast_spec);
             break;
-            TYPE_CASE(bf16)(arg0, arg1, out, broadcast_spec);
-            break;
             TYPE_CASE(f16)(arg0, arg1, out, broadcast_spec);
             break;
             TYPE_CASE(f32)(arg0, arg1, out, broadcast_spec);
-            break;
-            TYPE_CASE(f64)(arg0, arg1, out, broadcast_spec);
             break;
         default: rc = false; break;
         }
@@ -101,8 +90,10 @@ namespace
     }
 }
 
-bool op::v1::LogicalXor::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v1::LogicalXor::evaluate(const HostTensorVector& outputs,
+                                  const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v1::LogicalXor::evaluate");
     return evaluate_logxor(inputs[0], inputs[1], outputs[0], get_autob());
 }
 
@@ -122,7 +113,8 @@ shared_ptr<Node> op::v0::Xor::clone_with_new_inputs(const OutputVector& new_args
     return make_shared<v0::Xor>(new_args.at(0), new_args.at(1), this->get_autob());
 }
 
-bool op::v0::Xor::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Xor::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Xor::evaluate");
     return evaluate_logxor(inputs[0], inputs[1], outputs[0], get_autob());
 }

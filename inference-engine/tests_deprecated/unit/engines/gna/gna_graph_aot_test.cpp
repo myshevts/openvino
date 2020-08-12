@@ -4,7 +4,7 @@
 
 #include <vector>
 #include <gtest/gtest.h>
-#include <layer_transform.hpp>
+#include <legacy/layer_transform.hpp>
 #include "gna_matcher.hpp"
 
 using namespace InferenceEngine;
@@ -42,7 +42,7 @@ TEST_F(GNAAOTTests, DISABLED_AffineWith2AffineOutputs_canbe_export_imported) {
 }
 
 
-// Disabled because of random fails: CVS-23611
+// Disabled because of random fails: Issue-23611
 TEST_F(GNAAOTTests, DISABLED_AffineWith2AffineOutputs_canbe_imported_verify_structure) {
 
 #if GNA_LIB_VER == 2

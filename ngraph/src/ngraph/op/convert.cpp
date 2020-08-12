@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "ngraph/itt.hpp"
 #include "ngraph/op/convert.hpp"
 #include "ngraph/runtime/reference/convert.hpp"
 
@@ -46,15 +47,6 @@ shared_ptr<Node> op::Convert::clone_with_new_inputs(const OutputVector& new_args
 {
     check_new_args_count(this, new_args);
     return make_shared<Convert>(new_args.at(0), m_destination_type);
-}
-
-void op::Convert::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-
-    adjoints.add_delta(x, make_shared<op::Convert>(delta, x.get_element_type()));
 }
 
 namespace
@@ -116,29 +108,17 @@ namespace
 
         switch (arg->get_element_type())
         {
-            TYPE_CASE(i8)(arg, out);
-            break;
-            TYPE_CASE(i16)(arg, out);
-            break;
             TYPE_CASE(i32)(arg, out);
             break;
             TYPE_CASE(i64)(arg, out);
-            break;
-            TYPE_CASE(u8)(arg, out);
-            break;
-            TYPE_CASE(u16)(arg, out);
             break;
             TYPE_CASE(u32)(arg, out);
             break;
             TYPE_CASE(u64)(arg, out);
             break;
-            TYPE_CASE(bf16)(arg, out);
-            break;
             TYPE_CASE(f16)(arg, out);
             break;
             TYPE_CASE(f32)(arg, out);
-            break;
-            TYPE_CASE(f64)(arg, out);
             break;
         default: rc = false; break;
         }
@@ -146,7 +126,8 @@ namespace
     }
 }
 bool op::v0::Convert::evaluate(const HostTensorVector& output_values,
-                               const HostTensorVector& input_values)
+                               const HostTensorVector& input_values) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Convert::evaluate");
     return evaluate_convert(input_values[0], output_values[0]);
 }

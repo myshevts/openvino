@@ -1,4 +1,4 @@
-# Available Operations Sets
+# Available Operations Sets {#openvino_docs_ops_opset}
 
 According to capabilities of supported deep learning frameworks and hardware capabilities of a target inference device, all operations are combined into operations sets each fully supported in a specific version of OpenVINO™ toolkit. 
 
@@ -6,9 +6,11 @@ This topic provides a complete list of available sets of operations supported in
 
 | OpenVINO™ Version | Actual Operations Set            | 
 | :---------------- | :------------------------------- | 
-| 2020.4            | [opset3](./docs/ops/opset3.md)   | 
-| 2020.2            | [opset2](./docs/ops/opset2.md)   | 
-| 2020.1            | [opset1](./docs/ops/opset1.md)   | 
+| 2021.1            | [opset4](opset4.md)   | 
+| 2020.4            | [opset3](opset3.md)   |
+| 2020.3            | [opset2](opset2.md)   |
+| 2020.2            | [opset2](opset2.md)   | 
+| 2020.1            | [opset1](opset1.md)   | 
 
 ## See Also
-[Deep Learning Network Intermediate Representation and Operations Sets in OpenVINO™](./docs/MO_DG/IR_and_opsets.md)
+[Deep Learning Network Intermediate Representation and Operations Sets in OpenVINO™](../MO_DG/IR_and_opsets.md)

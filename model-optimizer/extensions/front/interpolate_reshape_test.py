@@ -26,25 +26,26 @@ from mo.utils.unittest.graph import build_graph, result, regular_op_with_shaped_
     connect_data
 
 nodes = {
-    **regular_op_with_shaped_data('placeholder', [1, 3, 30, 40], {'type': 'Parameter'}),
+    **regular_op_with_shaped_data('placeholder', [1, 3, 30, 40], {'type': 'Parameter', 'op': 'Parameter'}),
     **valued_const_with_data('out_shape', np.array([60, 160])),
 
     **regular_op_with_shaped_data('interpolate', [1, 3, 60, 160],
-                                  {'type': 'Interpolate', 'axes': int64_array([2, 3])}),
-    **regular_op_with_shaped_data('identity_00', [1, 3, 60, 160], {'identity': True}),
-    **regular_op_with_shaped_data('identity_01', [1, 3, 60, 160], {'identity': True}),
+                                  {'type': 'Interpolate', 'axes': int64_array([2, 3]), 'op': 'Interpolate'}),
+    **regular_op_with_shaped_data('identity_00', [1, 3, 60, 160], {'identity': True, 'op': 'Identity'}),
+    **regular_op_with_shaped_data('identity_01', [1, 3, 60, 160], {'identity': True, 'op': 'Identity'}),
 
-    **regular_op_with_shaped_data('shape', [4], {'type': 'ShapeOf'}),
+    **regular_op_with_shaped_data('shape', [4], {'type': 'ShapeOf', 'op': 'ShapeOf'}),
     **valued_const_with_data('indices', np.array([2, 3])),
     **valued_const_with_data('axis', np.array(0)),
-    **regular_op_with_shaped_data('gather', [2], {'type': 'Gather'}),
+    **regular_op_with_shaped_data('gather', [2], {'type': 'Gather', 'op': 'Gather'}),
 
-    **regular_op_with_shaped_data('placeholder_1', [1, 3, 60, 160], {'type': 'Parameter'}),
-    **regular_op_with_shaped_data('identity_10', [1, 3, 60, 160], {'identity': True}),
-    **regular_op_with_shaped_data('identity_11', [1, 3, 60, 160], {'identity': True}),
-    **regular_op_with_shaped_data('concat', [1, 7, 60, 160], {'type': 'Concat', 'axis': 1}),
+    **regular_op_with_shaped_data('placeholder_1', [1, 3, 60, 160], {'type': 'Parameter', 'op': 'Parameter'}),
+    **regular_op_with_shaped_data('identity_10', [1, 3, 60, 160], {'identity': True, 'op': 'Identity'}),
+    **regular_op_with_shaped_data('identity_11', [1, 3, 60, 160], {'identity': True, 'op': 'Identity'}),
+    **regular_op_with_shaped_data('concat', [1, 7, 60, 160], {'type': 'Concat', 'axis': 1, 'op': 'Concat'}),
 
-    **result(),
+    **result('output'),
+    **result('output_1'),
 }
 
 
@@ -106,6 +107,29 @@ class TestInterpolateConcat(unittest.TestCase):
             *connect('identity_10', 'identity_11'),
             *connect('identity_11', '1:concat'),
             *connect('concat', 'output'),
+        ], nodes_with_edges_only=True)
+        (flag, resp) = compare_graphs(graph, graph_ref, 'output', check_op_attrs=True)
+        self.assertTrue(flag, resp)
+
+    def test_interpolate_concat_negate(self):
+        graph = build_graph(nodes, [
+            *connect('placeholder', '0:interpolate'),
+            *connect('out_shape', '1:interpolate'),
+            *connect('interpolate', 'identity_00'),
+            *connect('interpolate', 'identity_01'),
+            *connect('identity_00', 'output'),
+            *connect('identity_01', 'output_1'),
+        ], nodes_with_edges_only=True)
+
+        InterpolateWithConcat().find_and_replace_pattern(graph)
+        graph.clean_up()
+        graph_ref = build_graph(nodes, [
+            *connect('placeholder', '0:interpolate'),
+            *connect('out_shape', '1:interpolate'),
+            *connect('interpolate', 'identity_00'),
+            *connect('interpolate', 'identity_01'),
+            *connect('identity_00', 'output'),
+            *connect('identity_01', 'output_1'),
         ], nodes_with_edges_only=True)
         (flag, resp) = compare_graphs(graph, graph_ref, 'output', check_op_attrs=True)
         self.assertTrue(flag, resp)

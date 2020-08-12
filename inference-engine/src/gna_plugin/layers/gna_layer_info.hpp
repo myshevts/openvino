@@ -7,8 +7,8 @@
 #include <string>
 #include <memory>
 #include <vector>
-#include "inference_engine.hpp"
-#include "details/caseless.hpp"
+#include "ie_layers.h"
+#include "caseless.hpp"
 #include "ie_algorithm.hpp"
 #include "gna-api.h"
 #include "gna_permute.hpp"
@@ -96,7 +96,14 @@ class LayerInfo {
              "abs",
              "neglog",
              "neghalflog",
-             "softsign"};
+             "softsign",
+             "power"};
+
+        if (isPower()) {
+            auto powerLayer = as<const InferenceEngine::PowerLayer*>();
+            return powerLayer != nullptr && powerLayer->power != 1.0f;
+        }
+
         return activations.find(layer->type) != activations.end();
     }
 
@@ -106,6 +113,9 @@ class LayerInfo {
     }
     bool isConcatAlignFilter() const noexcept {
         return isOfType("ConcatAlignFilter");
+    }
+    bool isLink() const noexcept {
+        return isOfType("Link");
     }
     bool isAffineFilter() const noexcept {
         return isOfType("AffineFilter");
@@ -128,7 +138,7 @@ class LayerInfo {
     }
     bool isOutput() const noexcept {
         for (auto& out : layer->outData) {
-            if (out->getInputTo().empty()) {
+            if (getInputTo(out).empty()) {
                 return true;
             }
         }

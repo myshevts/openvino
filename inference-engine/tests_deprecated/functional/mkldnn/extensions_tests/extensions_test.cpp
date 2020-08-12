@@ -23,8 +23,6 @@ struct extension_params {
     std::map<std::string, std::string> config;
 };
 
-using ext_factory = std::function<InferenceEngine::ILayerImplFactory*(const InferenceEngine::CNNLayer *)>;
-
 class FakePrimitiveImpl : public InferenceEngine::ILayerExecImpl {
 public:
     FakePrimitiveImpl(const InferenceEngine::CNNLayer *layer) {
@@ -61,26 +59,8 @@ private:
     InferenceEngine::CNNLayer* cnnLayer;
 };
 
-class FakePrimitiveFactory : public InferenceEngine::ILayerImplFactory {
-public:
-    FakePrimitiveFactory(const InferenceEngine::CNNLayer *layer) {
-        cnnLayer = const_cast<InferenceEngine::CNNLayer *>(layer);
-    }
-    // First implementation has more priority than next
-    InferenceEngine::StatusCode getImplementations(std::vector<InferenceEngine::ILayerImpl::Ptr>& impls, InferenceEngine::ResponseDesc *resp) noexcept override {
-        impls.push_back(InferenceEngine::ILayerImpl::Ptr(new FakePrimitiveImpl(cnnLayer)));
-        return InferenceEngine::OK;
-    }
-
-private:
-    InferenceEngine::CNNLayer * cnnLayer;
-};
-
 class TestExtension : public InferenceEngine::IExtension {
 public:
-    TestExtension() {
-        factories["Fake"] = [](const InferenceEngine::CNNLayer * cnnLayer) -> InferenceEngine::ILayerImplFactory* { return new FakePrimitiveFactory(cnnLayer); };
-    }
     void Release() noexcept override { delete this; }
 
     void GetVersion(const InferenceEngine::Version *&versionInfo) const noexcept override
@@ -90,28 +70,6 @@ public:
     }
 
     void Unload() noexcept override {}
-    StatusCode getPrimitiveTypes(char**& types, unsigned int& size, ResponseDesc* resp) noexcept override {
-        types = new char *[factories.size()];
-        size_t count = 0;
-        for (auto it = factories.begin(); it != factories.end(); it++, count ++) {
-            types[count] = new char[it->first.size() + 1];
-            std::copy(it->first.begin(), it->first.end(), types[count]);
-            types[count][it->first.size() ] = '\0';
-        }
-        return InferenceEngine::OK;
-    }
-
-    StatusCode getFactoryFor(ILayerImplFactory *&factory, const CNNLayer *cnnLayer, ResponseDesc *resp) noexcept override {
-        if (factories.find(cnnLayer->type) == factories.end()) {
-            std::string errorMsg = std::string("Factory for ") + cnnLayer->type + " wasn't found!";
-            errorMsg.copy(resp->msg, sizeof(resp->msg) - 1);
-            return InferenceEngine::NOT_FOUND;
-        }
-        factory = factories[cnnLayer->type](cnnLayer);
-        return InferenceEngine::OK;
-    }
-private:
-    std::map<std::string, ext_factory> factories;
 };
 
 class NewFakePrimitiveImpl : public InferenceEngine::ILayerExecImpl {
@@ -173,7 +131,7 @@ public:
         set_output_type(0, get_input_element_type(0), ngraph::PartialShape(output_shape));
     }
 
-    std::shared_ptr<ngraph::Node> copy_with_new_args(const ngraph::NodeVector& new_args) const override {
+    std::shared_ptr<ngraph::Node> clone_with_new_inputs(const ngraph::OutputVector& new_args) const override {
         if (new_args.size() != 1) {
             throw ngraph::ngraph_error("Incorrect number of new arguments");
         }
@@ -361,17 +319,17 @@ protected:
 #endif
 
 TEST_F(smoke_ExtensionTest, MKLDNN_delete_extension) {
-    std::shared_ptr<IExtension> ext(new TestExtension());
+    std::shared_ptr<IExtension> ext(new NewTestExtension());
     checkExtensionRemoved({"MKLDNN", ext});
 }
 
 TEST_F(smoke_ExtensionTest, MKLDNN_no_delete_extension_from_another_engine) {
-    std::shared_ptr<IExtension> ext(new TestExtension());
+    std::shared_ptr<IExtension> ext(new NewTestExtension());
     checkExtensionNotRemovedFromAnotherEngineObject({"MKLDNN", ext});
 }
 
 TEST_F(smoke_ExtensionTest, MKLDNN_no_share_extension_between_engines) {
-    std::shared_ptr<IExtension> ext(new TestExtension());
+    std::shared_ptr<IExtension> ext(new NewTestExtension());
     checkNotSharedExtensions(ext, "CPU");
 }
 

@@ -20,11 +20,13 @@
 
 #include "ngraph/attribute_visitor.hpp"
 #include "ngraph/builder/autobroadcast.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/constant.hpp"
 #include "ngraph/op/multiply.hpp"
 #include "ngraph/op/reshape.hpp"
 #include "ngraph/op/subtract.hpp"
 #include "ngraph/op/sum.hpp"
+#include "ngraph/op/util/op_types.hpp"
 #include "ngraph/runtime/reference/softmax.hpp"
 #include "ngraph/util.hpp"
 
@@ -53,7 +55,7 @@ op::v0::Softmax::Softmax(const Output<Node>& arg, const Output<Node>& axes)
 
 bool op::v0::Softmax::are_axes_constant() const
 {
-    return input_value(1).get_node_shared_ptr()->is_constant();
+    return op::is_constant(input_value(1).get_node());
 }
 
 const AxisSet op::v0::Softmax::get_axes() const
@@ -126,36 +128,6 @@ shared_ptr<Node> op::v0::Softmax::clone_with_new_inputs(const OutputVector& new_
     return make_shared<Softmax>(new_args.at(0), new_args.at(1));
 }
 
-void op::v0::Softmax::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-    NGRAPH_CHECK(are_axes_constant(), "axes need to be constant");
-    auto axes = get_axes();
-
-    auto z = delta * shared_from_this();
-    auto zsum = make_shared<op::Sum>(z, axes);
-
-    Shape shape;
-    for (size_t i = 0; i < get_shape().size(); ++i)
-    {
-        if (axes.find(i) == axes.end())
-        {
-            shape.push_back(get_shape()[i]);
-        }
-        else
-        {
-            shape.push_back(1);
-        }
-    }
-    auto order = ngraph::get_default_order(zsum->get_shape());
-    auto zreshape = make_shared<op::Reshape>(zsum, order, shape);
-
-    auto adjoint = z - builder::make_with_numpy_broadcast<op::Multiply>(output(0), zreshape);
-
-    auto x = input_value(0);
-    adjoints.add_delta(x, adjoint);
-}
-
 namespace
 {
     template <element::Type_t ET>
@@ -179,8 +151,10 @@ namespace
     }
 }
 
-bool op::v0::Softmax::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Softmax::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Softmax::evaluate");
     outputs[0]->set_unary(inputs[0]);
     return evaluate_softmax(inputs[0], outputs[0], get_axes());
 }
@@ -212,10 +186,8 @@ void op::v1::Softmax::validate_and_infer_types()
                               ") is out of bounds (argument shape: ",
                               input_shape,
                               ").");
-    if (input_shape.is_static())
-        set_output_type(0, get_input_element_type(0), input_shape.to_shape());
-    else
-        set_output_type(0, get_input_element_type(0), PartialShape::dynamic());
+
+    set_output_type(0, get_input_element_type(0), input_shape);
 }
 
 shared_ptr<Node> op::v1::Softmax::clone_with_new_inputs(const OutputVector& new_args) const
@@ -224,47 +196,10 @@ shared_ptr<Node> op::v1::Softmax::clone_with_new_inputs(const OutputVector& new_
     return make_shared<op::v1::Softmax>(new_args.at(0), m_axis);
 }
 
-bool op::v1::Softmax::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v1::Softmax::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v1::Softmax::evaluate");
     outputs[0]->set_unary(inputs[0]);
     return evaluate_softmax(inputs[0], outputs[0], AxisSet{m_axis});
-}
-
-void op::v1::Softmax::generate_adjoints(autodiff::Adjoints& /* adjoints */,
-                                        const OutputVector& /* deltas */)
-{
-    throw ngraph_error("op::v1::Softmax::generate_adjoints function is not implemented yet");
-
-    /* This might work, but as of this writing we have no way to test it, so we are being
-    careful
-    auto delta = deltas.at(0);
-
-    auto z = delta * shared_from_this();
-
-    std::vector<size_t> axes(get_shape().size() - m_axis);
-    std::iota(std::begin(axes), std::end(axes), m_axis);
-    AxisSet axes_set{axes};
-
-    auto zsum = make_shared<op::Sum>(z, axes_set);
-
-    Shape shape;
-    for (size_t i = 0; i < get_shape().size(); ++i)
-    {
-        if (axes_set.find(i) == axes_set.end())
-        {
-            shape.push_back(get_shape()[i]);
-        }
-        else
-        {
-            shape.push_back(1);
-        }
-    }
-    auto order = ngraph::get_default_order(zsum->get_shape());
-    auto zreshape = make_shared<op::Reshape>(zsum, order, shape);
-
-    auto adjoint = z - builder::make_with_numpy_broadcast<op::Multiply>(output(0), zreshape);
-
-    auto x = input_value(0);
-    adjoints.add_delta(x, adjoint);
-    */
 }

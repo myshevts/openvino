@@ -4,7 +4,7 @@
 
 #include "mkldnn_quantize_node.h"
 #include "desc_iterator.hpp"
-#include <ie_layers.h>
+#include <legacy/ie_layers.h>
 #include <string>
 #include <vector>
 #include <mkldnn_types.h>
@@ -12,7 +12,7 @@
 #include <ie_memcpy.h>
 #include <algorithm>
 #include <set>
-#include "details/caseless.hpp"
+#include <cmath>
 
 using namespace mkldnn;
 using namespace MKLDNNPlugin;
@@ -221,6 +221,11 @@ void MKLDNNQuantizeNode::init() {
             float il = inputLowData[isInputLowBroadcasted ? 0 : i];
             float ih = inputHighData[isInputHighBroadcasted ? 0 : i];
 
+            if (il == ih) {
+                if (levels != 2)
+                    THROW_IE_EXCEPTION << "Quantize layer with name '" << getName() << "' has wrong input quantize ranges";
+            }
+
             inputScale[i] = (levels - 1) / (ih - il);
             inputShift[i] = -il * (levels - 1) / (ih - il);
         }
@@ -228,6 +233,11 @@ void MKLDNNQuantizeNode::init() {
         for (int i = 0; i < outputScale.size(); i++) {
             float ol = outputLowData[isOutputLowBroadcasted ? 0 : i];
             float oh = outputHighData[isOutputHighBroadcasted ? 0 : i];
+
+            if (ol == oh) {
+                if (levels != 2)
+                    THROW_IE_EXCEPTION << "Quantize layer with name '" << getName() << "' has wrong output quantize ranges";
+            }
 
             outputScale[i] = (oh - ol) / (levels - 1);
 

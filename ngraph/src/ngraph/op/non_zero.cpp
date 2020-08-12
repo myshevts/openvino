@@ -15,6 +15,7 @@
 //*****************************************************************************
 
 #include "ngraph/op/non_zero.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/op.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/non_zero.hpp"
@@ -138,29 +139,19 @@ namespace
 
         switch (input->get_element_type())
         {
-            TYPE_CASE(i8)(input, output);
-            break;
-            TYPE_CASE(i16)(input, output);
-            break;
             TYPE_CASE(i32)(input, output);
             break;
             TYPE_CASE(i64)(input, output);
             break;
             TYPE_CASE(u8)(input, output);
             break;
-            TYPE_CASE(u16)(input, output);
-            break;
             TYPE_CASE(u32)(input, output);
             break;
             TYPE_CASE(u64)(input, output);
             break;
-            TYPE_CASE(bf16)(input, output);
-            break;
             TYPE_CASE(f16)(input, output);
             break;
             TYPE_CASE(f32)(input, output);
-            break;
-            TYPE_CASE(f64)(input, output);
             break;
         default: rc = false; break;
         }
@@ -168,7 +159,9 @@ namespace
     }
 }
 
-bool op::v3::NonZero::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v3::NonZero::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v3::NonZero::evaluate");
     return evaluate_nonzero(inputs[0], outputs[0]);
 }

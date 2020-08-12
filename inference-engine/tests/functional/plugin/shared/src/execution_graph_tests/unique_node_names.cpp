@@ -21,7 +21,7 @@
 
 #include "execution_graph_tests/unique_node_names.hpp"
 
-#include "network_serializer.h"
+std::vector<InferenceEngine::CNNLayerPtr> TopologicalSort(const InferenceEngine::ICNNNetwork& network);
 
 namespace LayerTestsDefinitions {
 
@@ -57,9 +57,6 @@ void ExecGraphUniqueNodeNames::SetUp() {
 }
 
 void ExecGraphUniqueNodeNames::TearDown() {
-    if (targetDevice.find(CommonTestUtils::DEVICE_GPU) != std::string::npos) {
-        PluginCache::get().reset();
-    }
 }
 
 TEST_P(ExecGraphUniqueNodeNames, CheckUniqueNodeNames) {
@@ -91,7 +88,7 @@ TEST_P(ExecGraphUniqueNodeNames, CheckUniqueNodeNames) {
             }
         }
     } else {
-        auto nodes = InferenceEngine::Serialization::TopologicalSort(execGraphInfo);
+        auto nodes = TopologicalSort(execGraphInfo);
         for (auto &node : nodes) {
             IE_SUPPRESS_DEPRECATED_START
             ASSERT_TRUE(names.find(node->name) == names.end()) <<

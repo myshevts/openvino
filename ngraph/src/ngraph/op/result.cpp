@@ -18,6 +18,7 @@
 #include <typeindex>
 #include <typeinfo>
 
+#include "ngraph/itt.hpp"
 #include "ngraph/node.hpp"
 #include "ngraph/op/result.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
@@ -55,15 +56,9 @@ shared_ptr<Node> op::Result::clone_with_new_inputs(const OutputVector& new_args)
     return std::move(res);
 }
 
-void op::Result::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
+bool op::Result::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
-    auto delta = deltas.at(0);
-
-    adjoints.add_delta(input_value(0), delta);
-}
-
-bool op::Result::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
-{
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Result::evaluate");
     outputs[0]->set_unary(inputs[0]);
     void* output = outputs[0]->get_data_ptr();
     void* input = inputs[0]->get_data_ptr();

@@ -16,6 +16,7 @@
 
 #include "ngraph/op/product.hpp"
 #include "ngraph/graph_util.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/product.hpp"
 #include "ngraph/shape_util.hpp"
@@ -64,29 +65,17 @@ namespace
         bool rc = true;
         switch (arg->get_element_type())
         {
-            TYPE_CASE(i8)(arg, out, axes);
-            break;
-            TYPE_CASE(i16)(arg, out, axes);
-            break;
             TYPE_CASE(i32)(arg, out, axes);
             break;
             TYPE_CASE(i64)(arg, out, axes);
-            break;
-            TYPE_CASE(u8)(arg, out, axes);
-            break;
-            TYPE_CASE(u16)(arg, out, axes);
             break;
             TYPE_CASE(u32)(arg, out, axes);
             break;
             TYPE_CASE(u64)(arg, out, axes);
             break;
-            TYPE_CASE(bf16)(arg, out, axes);
-            break;
             TYPE_CASE(f16)(arg, out, axes);
             break;
             TYPE_CASE(f32)(arg, out, axes);
-            break;
-            TYPE_CASE(f64)(arg, out, axes);
             break;
         default: rc = false; break;
         }
@@ -94,7 +83,9 @@ namespace
     }
 }
 
-bool op::v0::Product::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Product::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Product::evaluate");
     return evaluate_product(inputs[0], outputs[0], get_reduction_axes());
 }

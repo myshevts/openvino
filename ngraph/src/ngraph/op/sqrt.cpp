@@ -14,9 +14,11 @@
 // limitations under the License.
 //*****************************************************************************
 
-#include "ngraph/op/sqrt.hpp"
+#include "ngraph/itt.hpp"
+
 #include "ngraph/op/add.hpp"
 #include "ngraph/op/divide.hpp"
+#include "ngraph/op/sqrt.hpp"
 
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/sqrt.hpp"
@@ -43,15 +45,6 @@ shared_ptr<Node> op::Sqrt::clone_with_new_inputs(const OutputVector& new_args) c
     return make_shared<Sqrt>(new_args.at(0));
 }
 
-void op::Sqrt::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-
-    adjoints.add_delta(x, delta / (shared_from_this() + shared_from_this()));
-}
-
 namespace
 {
     template <element::Type_t ET>
@@ -68,19 +61,9 @@ namespace
         out->set_unary(arg0);
         switch (arg0->get_element_type())
         {
-            TYPE_CASE(boolean)(arg0, out, count);
-            break;
-            TYPE_CASE(i8)(arg0, out, count);
-            break;
-            TYPE_CASE(i16)(arg0, out, count);
-            break;
             TYPE_CASE(i32)(arg0, out, count);
             break;
             TYPE_CASE(i64)(arg0, out, count);
-            break;
-            TYPE_CASE(u8)(arg0, out, count);
-            break;
-            TYPE_CASE(u16)(arg0, out, count);
             break;
             TYPE_CASE(u32)(arg0, out, count);
             break;
@@ -88,11 +71,7 @@ namespace
             break;
             TYPE_CASE(f16)(arg0, out, count);
             break;
-            TYPE_CASE(bf16)(arg0, out, count);
-            break;
             TYPE_CASE(f32)(arg0, out, count);
-            break;
-            TYPE_CASE(f64)(arg0, out, count);
             break;
         default: rc = false; break;
         }
@@ -100,7 +79,8 @@ namespace
     }
 }
 
-bool op::Sqrt::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::Sqrt::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Sqrt::evaluate");
     return evaluate_sqrt(inputs[0], outputs[0], shape_size(get_output_shape(0)));
 }

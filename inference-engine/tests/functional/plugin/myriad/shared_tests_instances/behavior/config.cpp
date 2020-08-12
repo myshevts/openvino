@@ -6,8 +6,8 @@
 #include "vpu/vpu_plugin_config.hpp"
 #include "behavior/config.hpp"
 
+using namespace BehaviorTestsDefinitions;
 namespace {
-
     const std::vector<InferenceEngine::Precision> netPrecisions = {
             InferenceEngine::Precision::FP32,
             InferenceEngine::Precision::FP16
@@ -26,6 +26,10 @@ namespace {
 
             {{VPU_CONFIG_KEY(HW_STAGES_OPTIMIZATION), CONFIG_VALUE(YES)}},
             {{VPU_CONFIG_KEY(HW_STAGES_OPTIMIZATION), CONFIG_VALUE(NO)}},
+
+            {{VPU_CONFIG_KEY(TILING_CMX_LIMIT_KB), "-1"}},
+            {{VPU_CONFIG_KEY(TILING_CMX_LIMIT_KB), "0"}},
+            {{VPU_CONFIG_KEY(TILING_CMX_LIMIT_KB), "10"}},
 
             {{VPU_CONFIG_KEY(PRINT_RECEIVE_TENSOR_TIME), CONFIG_VALUE(YES)}},
             {{VPU_CONFIG_KEY(PRINT_RECEIVE_TENSOR_TIME), CONFIG_VALUE(NO)}},
@@ -72,6 +76,8 @@ namespace {
             {{VPU_MYRIAD_CONFIG_KEY(PLATFORM), "-1"}},
             {{VPU_MYRIAD_CONFIG_KEY(PLATFORM), "0"}},
             {{VPU_MYRIAD_CONFIG_KEY(PLATFORM), "1"}},
+
+            {{VPU_CONFIG_KEY(TILING_CMX_LIMIT_KB), "-10"}},
 
             {{VPU_CONFIG_KEY(PRINT_RECEIVE_TENSOR_TIME), "ON"}},
             {{VPU_CONFIG_KEY(PRINT_RECEIVE_TENSOR_TIME), "OFF"}}

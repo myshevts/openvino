@@ -40,29 +40,7 @@ namespace ngraph
                 Gelu(const Output<Node>& data);
 
                 bool visit_attributes(AttributeVisitor& visitor) override;
-                virtual NodeVector decompose_op() const override;
-
-                void pre_validate_and_infer_types() override;
-
-                virtual std::shared_ptr<Node>
-                    clone_with_new_inputs(const OutputVector& new_args) const override;
-
-            protected:
-                virtual void generate_adjoints(autodiff::Adjoints& adjoints,
-                                               const OutputVector& deltas) override;
-            };
-
-            /// \brief Backprop for Gelu(x) is GeluBackprop(x) * delta
-            class NGRAPH_API GeluBackpropFactor : public util::FusedOp
-            {
-            public:
-                static constexpr NodeTypeInfo type_info{"GeluBackpropFactor", 0};
-                const NodeTypeInfo& get_type_info() const override { return type_info; }
-                GeluBackpropFactor() = default;
-
-                GeluBackpropFactor(const Output<Node>& x);
-
-                virtual NodeVector decompose_op() const override;
+                virtual OutputVector decompose_op() const override;
 
                 void pre_validate_and_infer_types() override;
 
@@ -71,6 +49,5 @@ namespace ngraph
             };
         }
         using v0::Gelu;
-        using v0::GeluBackpropFactor;
     }
 }

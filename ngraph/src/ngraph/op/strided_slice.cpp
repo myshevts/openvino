@@ -16,10 +16,11 @@
 
 #include "ngraph/op/strided_slice.hpp"
 #include "ngraph/attribute_visitor.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/broadcast.hpp"
 #include "ngraph/op/constant.hpp"
-#include "ngraph/op/experimental/shape_of.hpp"
 #include "ngraph/op/gather.hpp"
+#include "ngraph/op/shape_of.hpp"
 #include "ngraph/pass/constant_folding.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/strided_slice.hpp"
@@ -227,12 +228,6 @@ shared_ptr<Node> op::v1::StridedSlice::clone_with_new_inputs(const OutputVector&
                                          m_ellipsis_mask);
 }
 
-void op::v1::StridedSlice::generate_adjoints(autodiff::Adjoints& /* adjoints */,
-                                             const OutputVector& /* deltas */)
-{
-    throw ngraph_error("generate_adjoints not implemented for StridedSlice");
-}
-
 namespace
 {
     template <element::Type_t ET>
@@ -241,8 +236,11 @@ namespace
     {
         auto in_shape = in->get_shape();
         out->set_shape(sp.reshape_out_shape);
-        runtime::reference::strided_slice(
-            in->get_data_ptr<ET>(), out->get_data_ptr<ET>(), in_shape, sp);
+        runtime::reference::strided_slice(in->get_data_ptr<ET>(),
+                                          out->get_data_ptr<ET>(),
+                                          in_shape,
+                                          sp,
+                                          in->get_element_type().size());
         return true;
     }
 
@@ -273,29 +271,17 @@ namespace
                                                ellipsis_mask);
         switch (in->get_element_type())
         {
-            TYPE_CASE(i8)(in, slice_plan, out);
-            break;
-            TYPE_CASE(i16)(in, slice_plan, out);
-            break;
             TYPE_CASE(i32)(in, slice_plan, out);
             break;
             TYPE_CASE(i64)(in, slice_plan, out);
-            break;
-            TYPE_CASE(u8)(in, slice_plan, out);
-            break;
-            TYPE_CASE(u16)(in, slice_plan, out);
             break;
             TYPE_CASE(u32)(in, slice_plan, out);
             break;
             TYPE_CASE(u64)(in, slice_plan, out);
             break;
-            TYPE_CASE(bf16)(in, slice_plan, out);
-            break;
             TYPE_CASE(f16)(in, slice_plan, out);
             break;
             TYPE_CASE(f32)(in, slice_plan, out);
-            break;
-            TYPE_CASE(f64)(in, slice_plan, out);
             break;
         default: rc = false; break;
         }
@@ -304,8 +290,9 @@ namespace
 }
 
 bool op::v1::StridedSlice::evaluate(const HostTensorVector& output_values,
-                                    const HostTensorVector& input_values)
+                                    const HostTensorVector& input_values) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v1::StridedSlice::evaluate");
     return evaluate_strided_slice(input_values[0],
                                   input_values[1],
                                   input_values[2],

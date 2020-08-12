@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "ngraph/itt.hpp"
 #include "ngraph/op/asinh.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/asinh.hpp"
@@ -55,29 +56,17 @@ namespace
         out->set_unary(arg0);
         switch (arg0->get_element_type())
         {
-            TYPE_CASE(i8)(arg0, out);
-            break;
-            TYPE_CASE(i16)(arg0, out);
-            break;
             TYPE_CASE(i32)(arg0, out);
             break;
             TYPE_CASE(i64)(arg0, out);
-            break;
-            TYPE_CASE(u8)(arg0, out);
-            break;
-            TYPE_CASE(u16)(arg0, out);
             break;
             TYPE_CASE(u32)(arg0, out);
             break;
             TYPE_CASE(u64)(arg0, out);
             break;
-            TYPE_CASE(bf16)(arg0, out);
-            break;
             TYPE_CASE(f16)(arg0, out);
             break;
             TYPE_CASE(f32)(arg0, out);
-            break;
-            TYPE_CASE(f64)(arg0, out);
             break;
         default: rc = false; break;
         }
@@ -85,7 +74,8 @@ namespace
     }
 }
 
-bool op::v3::Asinh::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v3::Asinh::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v3::Asinh::evaluate");
     return evaluate_asinh(inputs[0], outputs[0]);
 }

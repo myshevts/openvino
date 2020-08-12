@@ -17,12 +17,11 @@
 #include "simple_math.h"
 #include <description_buffer.hpp>
 #include <cldnn/cldnn_config.hpp>
-#include <graph_tools.hpp>
-#include <ie_layers_internal.hpp>
-#include <net_pass.h>
+#include <legacy/graph_tools.hpp>
+#include <legacy/ie_layers_internal.hpp>
+#include <legacy/net_pass.h>
 #include "cldnn_infer_request.h"
 #include <threading/ie_executor_manager.hpp>
-#include "details/caseless.hpp"
 #include <fstream>
 #include <utility>
 #include <sys/types.h>
@@ -103,7 +102,6 @@ std::shared_ptr<cldnn::network> CLDNNGraph::BuildNetwork(std::shared_ptr<cldnn::
 InferenceEngine::ICNNNetwork::Ptr CLDNNGraph::GetExecGraphInfoByPrimitivesInfo(std::vector<cldnn::primitive_info>& primitives_info,
                                                                                bool filter_const_primitives) {
     auto net = std::make_shared<details::CNNNetworkImpl>();
-    net->setPrecision(Precision::FP32);
     net->setName("runtime_gpu_graph");
     if (m_config.useProfiling) {
         try {
@@ -187,7 +185,8 @@ InferenceEngine::ICNNNetwork::Ptr CLDNNGraph::GetExecGraphInfoByPrimitivesInfo(s
                 { "reduce_l1", "ReduceL1" },
                 { "reduce_l2", "ReduceL2" },
                 { "reduce_log_sum", "ReduceLogSum" },
-                { "reduce_log_sum_exp", "ReduceLogSumExp" }
+                { "reduce_log_sum_exp", "ReduceLogSumExp" },
+                { "space_to_depth", "SpaceToDepth" },
         };
 
         if (type_n2l.find(cldnn_name) != type_n2l.end())
@@ -415,7 +414,7 @@ InferenceEngine::ICNNNetwork::Ptr CLDNNGraph::GetExecGraphInfoByPrimitivesInfo(s
                 std::string data_name = pi.original_id + "_out" + std::to_string(i);
                 layer->outData[i] = std::make_shared<Data>(data_name, desc_from_layout(pi.output_layout));
                 data = layer->outData[i];
-                data->getCreatorLayer() = layer;
+                getCreatorLayer(data) = layer;
             } else {
                 data = layer->outData[0];
             }
@@ -432,7 +431,7 @@ InferenceEngine::ICNNNetwork::Ptr CLDNNGraph::GetExecGraphInfoByPrimitivesInfo(s
                 }
 
                 if (dep == pi.original_id && child_layer->insData[in_port_id].lock() == nullptr) {
-                    data->getInputTo()[child_layer->name] = child_layer;
+                    getInputTo(data)[child_layer->name] = child_layer;
                     child_layer->insData[in_port_id] = data;
                     break;
                 }

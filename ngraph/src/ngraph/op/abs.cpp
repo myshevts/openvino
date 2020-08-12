@@ -14,6 +14,8 @@
 // limitations under the License.
 //*****************************************************************************
 
+#include "ngraph/itt.hpp"
+
 #include "ngraph/op/abs.hpp"
 #include "ngraph/op/multiply.hpp"
 #include "ngraph/op/sign.hpp"
@@ -38,15 +40,6 @@ shared_ptr<Node> op::Abs::clone_with_new_inputs(const OutputVector& new_args) co
     return make_shared<Abs>(new_args.at(0));
 }
 
-void op::Abs::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-
-    adjoints.add_delta(x, delta * make_shared<op::Sign>(x));
-}
-
 namespace
 {
     template <element::Type_t ET>
@@ -66,29 +59,17 @@ namespace
         {
             TYPE_CASE(boolean)(arg0, out, count);
             break;
-            TYPE_CASE(i8)(arg0, out, count);
-            break;
-            TYPE_CASE(i16)(arg0, out, count);
-            break;
             TYPE_CASE(i32)(arg0, out, count);
             break;
             TYPE_CASE(i64)(arg0, out, count);
-            break;
-            TYPE_CASE(u8)(arg0, out, count);
-            break;
-            TYPE_CASE(u16)(arg0, out, count);
             break;
             TYPE_CASE(u32)(arg0, out, count);
             break;
             TYPE_CASE(u64)(arg0, out, count);
             break;
-            TYPE_CASE(bf16)(arg0, out, count);
-            break;
             TYPE_CASE(f16)(arg0, out, count);
             break;
             TYPE_CASE(f32)(arg0, out, count);
-            break;
-            TYPE_CASE(f64)(arg0, out, count);
             break;
         default: rc = false; break;
         }
@@ -96,7 +77,8 @@ namespace
     }
 }
 
-bool op::Abs::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::Abs::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Abs::evaluate");
     return evaluate_abs(inputs[0], outputs[0], shape_size(get_output_shape(0)));
 }

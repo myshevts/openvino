@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstdio>
 
+#include "ngraph/itt.hpp"
 #include "ngraph/log.hpp"
 #include "ngraph/op/constant.hpp"
 #include "ngraph/op/util/attr_types.hpp"
@@ -317,8 +318,9 @@ op::Constant::Constant(const element::Type& type, const Shape& shape, const void
 }
 
 op::Constant::Constant(const Constant& other)
-    : Constant(other.m_element_type, other.m_shape)
 {
+    m_element_type = other.m_element_type;
+    m_shape = other.m_shape;
     m_data = other.m_data;
     m_all_elements_bitwise_identical = other.m_all_elements_bitwise_identical;
     constructor_validate_and_infer_types();
@@ -627,34 +629,13 @@ bool op::v0::Constant::visit_attributes(AttributeVisitor& visitor)
     return true;
 }
 
-bool op::v0::Constant::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Constant::evaluate(const HostTensorVector& outputs,
+                                const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Constant::evaluate");
     auto output = outputs[0];
     output->write(get_data_ptr(), output->get_size_in_bytes());
     return true;
-}
-
-constexpr NodeTypeInfo op::ScalarConstantLike::type_info;
-
-shared_ptr<op::Constant> op::ScalarConstantLike::as_constant() const
-{
-    return std::make_shared<op::Constant>(m_element_type, m_shape, get_data_ptr());
-}
-
-std::shared_ptr<Node>
-    op::ScalarConstantLike::clone_with_new_inputs(const OutputVector& new_args) const
-{
-    return std::make_shared<ScalarConstantLike>(new_args.at(0), m_value);
-}
-
-void op::ScalarConstantLike::infer_element_type()
-{
-    m_element_type = get_input_element_type(0);
-    if (nullptr == m_data)
-    {
-        allocate_buffer();
-        write_values(std::vector<double>(1, m_value));
-    }
 }
 
 //

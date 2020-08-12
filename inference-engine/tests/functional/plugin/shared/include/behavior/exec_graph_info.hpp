@@ -13,13 +13,14 @@
 #include <vector>
 #include <string>
 #include <ie_core.hpp>
-#include <details/ie_cnn_network_tools.h>
+#include <legacy/details/ie_cnn_network_tools.h>
 #include <functional_test_utils/behavior_test_utils.hpp>
 #include <exec_graph_info.hpp>
 #include "common_test_utils/common_utils.hpp"
 #include "functional_test_utils/plugin_cache.hpp"
 #include "functional_test_utils/blob_utils.hpp"
 
+namespace BehaviorTestsDefinitions {
 using ExecGraphTests = BehaviorTestsUtils::BehaviorTestsBasic;
 
 inline std::vector<std::string> separateStrToVec(std::string str, const char sep) {
@@ -241,3 +242,4 @@ TEST_P(ExecGraphTests, CheckExecGraphInfoSerialization) {
                      InferenceEngine::details::InferenceEngineException);
     }
 }
+}  // namespace BehaviorTestsDefinitions

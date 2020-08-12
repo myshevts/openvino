@@ -15,6 +15,7 @@
 //*****************************************************************************
 
 #include "ngraph/op/ceiling.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/util/eval_copy.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/ceiling.hpp"
@@ -81,13 +82,9 @@ namespace
             break;
             COPY_TENSOR(u64)(arg0, out, count);
             break;
-            TYPE_CASE(bf16)(arg0, out, count);
-            break;
             TYPE_CASE(f16)(arg0, out, count);
             break;
             TYPE_CASE(f32)(arg0, out, count);
-            break;
-            TYPE_CASE(f64)(arg0, out, count);
             break;
         default: rc = false; break;
         }
@@ -95,7 +92,8 @@ namespace
     }
 }
 
-bool op::Ceiling::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::Ceiling::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Ceiling::evaluate");
     return evaluate_ceiling(inputs[0], outputs[0], shape_size(get_output_shape(0)));
 }

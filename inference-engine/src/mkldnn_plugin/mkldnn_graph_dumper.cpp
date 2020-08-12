@@ -3,9 +3,9 @@
 //
 
 #include "mkldnn_graph_dumper.h"
-#include "cnn_network_impl.hpp"
-#include "ie_util_internal.hpp"
-#include "ie_ngraph_utils.hpp"
+#include <legacy/cnn_network_impl.hpp>
+#include <legacy/ie_util_internal.hpp>
+#include <legacy/ie_ngraph_utils.hpp>
 #include "exec_graph_info.hpp"
 #include "mkldnn_debug.h"
 #include "generic_ie.hpp"
@@ -129,7 +129,6 @@ std::shared_ptr<ICNNNetwork> dump_graph_as_ie_ngraph_net(const MKLDNNGraph &grap
 std::shared_ptr<ICNNNetwork> dump_graph_as_ie_net(const MKLDNNGraph &graph) {
     auto net = std::make_shared<details::CNNNetworkImpl>();
 
-    net->setPrecision(Precision::FP32);
     net->setName(graph._name);
     std::map<MKLDNNNodePtr, CNNLayerPtr> node2layer;
 
@@ -156,12 +155,12 @@ std::shared_ptr<ICNNNetwork> dump_graph_as_ie_net(const MKLDNNGraph &graph) {
                 std::string data_name = node->getName() + "_out" + std::to_string(i);
                 pr->outData[i] = std::make_shared<Data>(data_name, edge->getDesc());
                 data = pr->outData[i];
-                data->getCreatorLayer() = pr;
+                getCreatorLayer(data) = pr;
             } else {
                 data = pr->outData[0];
             }
 
-            data->getInputTo()[ch->name] = ch;
+            getInputTo(data)[ch->name] = ch;
             ch->insData[in_port] = data;
         }
     }

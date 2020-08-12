@@ -14,34 +14,12 @@
 #include <string>
 #include <vector>
 
-#include <cpp/ie_executable_network.hpp>
-#include "details/os/os_filesystem.hpp"
+#include "ie_version.hpp"
 #include "ie_extension.h"
 #include "ie_remote_context.hpp"
+#include "cpp/ie_executable_network.hpp"
 
 namespace InferenceEngine {
-
-/**
- * @brief Responce structure encapsulating information about supported layer
- */
-struct QueryNetworkResult {
-    /**
-     * @brief A map of supported layers:
-     * - key - a layer name
-     * - value - a device name on which layer is assigned
-     */
-    std::map<std::string, std::string> supportedLayersMap;
-
-    /**
-     * @brief A status code
-     */
-    StatusCode rc = OK;
-
-    /**
-     * @brief Response message
-     */
-    ResponseDesc resp;
-};
 
 /**
  * @brief This class represents Inference Engine Core entity.
@@ -73,29 +51,35 @@ public:
 
 #ifdef ENABLE_UNICODE_PATH_SUPPORT
     /**
-     * @brief Reads IR xml and bin files
-     * @param modelPath path to IR file
-     * @param binPath path to bin file, if path is empty, will try to read bin file with the same name as xml and
-     * if bin file with the same name was not found, will load IR without weights.
+     * @brief Reads models from IR and ONNX formats
+     * @param modelPath path to model
+     * @param binPath path to data file
+     * For IR format (*.bin):
+     *  * if path is empty, will try to read bin file with the same name as xml and
+     *  * if bin file with the same name was not found, will load IR without weights.
+     * ONNX models with data files are not supported
      * @return CNNNetwork
      */
-    CNNNetwork ReadNetwork(const std::wstring& modelPath, const std::wstring& binPath = {}) const {
-        return ReadNetwork(details::wStringtoMBCSstringChar(modelPath), details::wStringtoMBCSstringChar(binPath));
-    }
+    CNNNetwork ReadNetwork(const std::wstring& modelPath, const std::wstring& binPath = {}) const;
 #endif
 
     /**
-     * @brief Reads IR xml and bin files
-     * @param modelPath path to IR file
-     * @param binPath path to bin file, if path is empty, will try to read bin file with the same name as xml and
-     * if bin file with the same name was not found, will load IR without weights.
+     * @brief Reads models from IR and ONNX formats
+     * @param modelPath path to model
+     * @param binPath path to data file
+     * For IR format (*.bin):
+     *  * if path is empty, will try to read bin file with the same name as xml and
+     *  * if bin file with the same name was not found, will load IR without weights.
+     * ONNX models with data files are not supported
      * @return CNNNetwork
      */
     CNNNetwork ReadNetwork(const std::string& modelPath, const std::string& binPath = {}) const;
     /**
-     * @brief Reads IR xml and bin (with the same name) files
-     * @param model string with IR
+     * @brief Reads models from IR and ONNX formats
+     * @param model string with model in IR or ONNX format
      * @param weights shared pointer to constant blob with weights
+     * ONNX models doesn't support models with data blobs.
+     * For ONNX case the second parameter should contain empty blob.
      * @return CNNNetwork
      */
     CNNNetwork ReadNetwork(const std::string& model, const Blob::CPtr& weights) const;
@@ -189,7 +173,7 @@ public:
      * @return An object containing a map of pairs a layer name -> a device name supporting this layer.
      */
     QueryNetworkResult QueryNetwork(
-        const ICNNNetwork& network, const std::string& deviceName,
+        const CNNNetwork& network, const std::string& deviceName,
         const std::map<std::string, std::string>& config = {}) const;
 
     /**

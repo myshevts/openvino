@@ -7,7 +7,6 @@
 #include "common_test_utils/test_constants.hpp"
 
 using namespace LayerTestsDefinitions;
-using namespace LayerTestsDefinitions::EltwiseParams;
 
 namespace {
 std::vector<std::vector<std::vector<size_t>>> inShapes = {
@@ -29,14 +28,14 @@ std::vector<InferenceEngine::Precision> netPrecisions = {
         InferenceEngine::Precision::FP16,
 };
 
-std::vector<InputLayerType> secondaryInputTypes = {
-        InputLayerType::CONSTANT,
-        InputLayerType::PARAMETER,
+std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
+        ngraph::helpers::InputLayerType::CONSTANT,
+        ngraph::helpers::InputLayerType::PARAMETER,
 };
 
-std::vector<OpType> opTypes = {
-        OpType::SCALAR,
-        OpType::VECTOR,
+std::vector<CommonTestUtils::OpType> opTypes = {
+        CommonTestUtils::OpType::SCALAR,
+        CommonTestUtils::OpType::VECTOR,
 };
 
 std::vector<ngraph::helpers::EltwiseTypes> eltwiseOpTypes = {

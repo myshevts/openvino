@@ -14,8 +14,8 @@
 #include <string>
 #include <vector>
 
-#include "details/ie_so_pointer.hpp"
 #include "ie_iextension.h"
+#include "details/ie_so_pointer.hpp"
 
 namespace InferenceEngine {
 namespace details {
@@ -38,7 +38,6 @@ public:
 /**
  * @brief This class is a C++ helper to work with objects created using extensions.
  */
-IE_SUPPRESS_DEPRECATED_START_WIN
 class INFERENCE_ENGINE_API_CLASS(Extension) : public IExtension {
 public:
     /**
@@ -46,7 +45,9 @@ public:
      *
      * @param name Full or relative path to extension library
      */
-    explicit Extension(const file_name_t& name): actual(name) {}
+    template <typename C,
+              typename = details::enableIfSupportedChar<C>>
+    explicit Extension(const std::basic_string<C>& name): actual(name) {}
 
     /**
      * @brief Gets the extension version information
@@ -68,41 +69,6 @@ public:
      * @brief Does nothing since destruction is done via the regular mechanism
      */
     void Release() noexcept override {}
-
-    /**
-     * @deprecated Use IExtension::getImplTypes to get implementation types for a particular node.
-     * The method will removed in 2021.1 release.
-     * @brief Gets the array with types of layers which are included in the extension
-     *
-     * @param types Types array
-     * @param size Size of the types array
-     * @param resp Response descriptor
-     * @return Status code
-     */
-    INFERENCE_ENGINE_DEPRECATED("Use IExtension::getImplTypes to get implementation types for a particular node")
-    StatusCode getPrimitiveTypes(char**& types, unsigned int& size, ResponseDesc* resp) noexcept override {
-        IE_SUPPRESS_DEPRECATED_START
-        return actual->getPrimitiveTypes(types, size, resp);
-        IE_SUPPRESS_DEPRECATED_END
-    }
-
-    /**
-     * @deprecated Use IExtension::getImplementation to get a concrete implementation.
-     * The method will be removed in 2021.1 release.
-     * @brief Gets the factory with implementations for a given layer
-     *
-     * @param factory Factory with implementations
-     * @param cnnLayer A layer to get the factory for
-     * @param resp Response descriptor
-     * @return Status code
-     */
-    IE_SUPPRESS_DEPRECATED_START
-    INFERENCE_ENGINE_DEPRECATED("Use IExtension::getImplementation to get a concrete implementation")
-    StatusCode getFactoryFor(ILayerImplFactory*& factory, const CNNLayer* cnnLayer,
-                             ResponseDesc* resp) noexcept override {
-        return actual->getFactoryFor(factory, cnnLayer, resp);
-    }
-    IE_SUPPRESS_DEPRECATED_END
 
     /**
      * @brief Returns operation sets
@@ -136,18 +102,27 @@ protected:
     /**
      * @brief A SOPointer instance to the loaded templated object
      */
-    InferenceEngine::details::SOPointer<IExtension> actual;
+    details::SOPointer<IExtension> actual;
 };
 
 /**
  * @brief Creates a special shared_pointer wrapper for the given type from a specific shared module
  *
- * @param name Name of the shared library file
+ * @param name A std::string name of the shared library file
  * @return shared_pointer A wrapper for the given type from a specific shared module
  */
 template <>
-inline std::shared_ptr<IExtension> make_so_pointer(const file_name_t& name) {
+inline std::shared_ptr<IExtension> make_so_pointer(const std::string& name) {
     return std::make_shared<Extension>(name);
 }
+
+#ifdef ENABLE_UNICODE_PATH_SUPPORT
+
+template <>
+inline std::shared_ptr<IExtension> make_so_pointer(const std::wstring& name) {
+    return std::make_shared<Extension>(name);
+}
+
+#endif
 
 }  // namespace InferenceEngine

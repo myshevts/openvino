@@ -10,7 +10,8 @@
 #include <vector>
 #include <unordered_set>
 
-#include "cnn_network_impl.hpp"
+#include <legacy/ie_layers.h>
+#include <legacy/cnn_network_impl.hpp>
 
 #include "low_precision_transformations/common/dequantization_details.hpp"
 #include "low_precision_transformations/transformation_context.hpp"
@@ -222,7 +223,7 @@ private:
         }
 
         IE_SUPPRESS_DEPRECATED_START
-        const CNNLayerPtr blobLayer = data->getCreatorLayer().lock();
+        const CNNLayerPtr blobLayer = getCreatorLayer(data).lock();
         if (blobLayer == nullptr) {
             THROW_IE_EXCEPTION << "parent layer is absent for " << quantize.type << " layer " << quantize.name;
         }

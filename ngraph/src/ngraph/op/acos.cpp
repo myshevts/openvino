@@ -14,6 +14,8 @@
 // limitations under the License.
 //*****************************************************************************
 
+#include "ngraph/itt.hpp"
+
 #include "ngraph/op/acos.hpp"
 
 #include "ngraph/axis_set.hpp"
@@ -47,18 +49,6 @@ shared_ptr<Node> op::Acos::clone_with_new_inputs(const OutputVector& new_args) c
     return make_shared<Acos>(new_args.at(0));
 }
 
-void op::Acos::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-
-    auto one = make_shared<op::ScalarConstantLike>(x, 1.0);
-    auto ones = make_shared<op::BroadcastLike>(one, x, AxisSet());
-
-    adjoints.add_delta(x, -delta / make_shared<op::Sqrt>(ones - x * x));
-}
-
 namespace
 {
     template <element::Type_t ET>
@@ -78,29 +68,17 @@ namespace
         {
             TYPE_CASE(boolean)(arg0, out, count);
             break;
-            TYPE_CASE(i8)(arg0, out, count);
-            break;
-            TYPE_CASE(i16)(arg0, out, count);
-            break;
             TYPE_CASE(i32)(arg0, out, count);
             break;
             TYPE_CASE(i64)(arg0, out, count);
-            break;
-            TYPE_CASE(u8)(arg0, out, count);
-            break;
-            TYPE_CASE(u16)(arg0, out, count);
             break;
             TYPE_CASE(u32)(arg0, out, count);
             break;
             TYPE_CASE(u64)(arg0, out, count);
             break;
-            TYPE_CASE(bf16)(arg0, out, count);
-            break;
             TYPE_CASE(f16)(arg0, out, count);
             break;
             TYPE_CASE(f32)(arg0, out, count);
-            break;
-            TYPE_CASE(f64)(arg0, out, count);
             break;
         default: rc = false; break;
         }
@@ -108,7 +86,8 @@ namespace
     }
 }
 
-bool op::Acos::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::Acos::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Acos::evaluate");
     return evaluate_acos(inputs[0], outputs[0], shape_size(get_output_shape(0)));
 }

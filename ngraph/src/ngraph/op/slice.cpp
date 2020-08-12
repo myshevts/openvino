@@ -16,6 +16,9 @@
 
 #include "ngraph/op/slice.hpp"
 
+#include "ngraph/runtime/host_tensor.hpp"
+#include "ngraph/runtime/reference/slice.hpp"
+
 using namespace std;
 using namespace ngraph;
 
@@ -131,11 +134,31 @@ shared_ptr<Node> op::Slice::clone_with_new_inputs(const OutputVector& new_args) 
     return make_shared<Slice>(new_args.at(0), m_lower_bounds, m_upper_bounds, m_strides);
 }
 
-void op::Slice::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
+namespace
 {
-    auto delta = deltas.at(0);
+    bool evaluate_slice(const HostTensorPtr& in,
+                        const HostTensorPtr& out,
+                        const Coordinate& lower_bounds,
+                        const Coordinate& upper_bounds,
+                        const Strides& strides)
+    {
+        runtime::reference::slice(in->get_data_ptr<const char>(),
+                                  out->get_data_ptr<char>(),
+                                  in->get_shape(),
+                                  lower_bounds,
+                                  upper_bounds,
+                                  strides,
+                                  out->get_shape(),
+                                  in->get_element_type().size());
 
-    auto x = input_value(0);
+        return true;
+    }
+}
 
-    adjoints.add_delta_to_slice(x, delta, m_lower_bounds, m_upper_bounds, m_strides);
+bool op::Slice::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
+{
+    const auto& data = inputs[0];
+    const auto& output = outputs[0];
+
+    return evaluate_slice(data, output, m_lower_bounds, m_upper_bounds, m_strides);
 }

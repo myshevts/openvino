@@ -14,8 +14,10 @@
 // limitations under the License.
 //*****************************************************************************
 
-#include "ngraph/op/relu.hpp"
+#include "ngraph/itt.hpp"
+
 #include "ngraph/op/multiply.hpp"
+#include "ngraph/op/relu.hpp"
 
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/relu.hpp"
@@ -23,8 +25,7 @@
 using namespace std;
 using namespace ngraph;
 
-constexpr NodeTypeInfo op::Relu::type_info;
-constexpr NodeTypeInfo op::ReluBackprop::type_info;
+NGRAPH_RTTI_DEFINITION(op::Relu, "Relu", 0);
 
 op::Relu::Relu(const Output<Node>& arg)
     : UnaryElementwiseArithmetic(arg)
@@ -57,29 +58,17 @@ namespace
         {
             TYPE_CASE(boolean)(arg0, out, count);
             break;
-            TYPE_CASE(i8)(arg0, out, count);
-            break;
-            TYPE_CASE(i16)(arg0, out, count);
-            break;
             TYPE_CASE(i32)(arg0, out, count);
             break;
             TYPE_CASE(i64)(arg0, out, count);
-            break;
-            TYPE_CASE(u8)(arg0, out, count);
-            break;
-            TYPE_CASE(u16)(arg0, out, count);
             break;
             TYPE_CASE(u32)(arg0, out, count);
             break;
             TYPE_CASE(u64)(arg0, out, count);
             break;
-            TYPE_CASE(bf16)(arg0, out, count);
-            break;
             TYPE_CASE(f16)(arg0, out, count);
             break;
             TYPE_CASE(f32)(arg0, out, count);
-            break;
-            TYPE_CASE(f64)(arg0, out, count);
             break;
         default: rc = false; break;
         }
@@ -87,27 +76,8 @@ namespace
     }
 }
 
-bool op::Relu::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::Relu::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Relu::evaluate");
     return evaluate_relu(inputs[0], outputs[0], shape_size(get_output_shape(0)));
-}
-
-op::ReluBackprop::ReluBackprop(const Output<Node>& arg, const Output<Node>& delta)
-    : BinaryElementwiseArithmetic(arg, delta, AutoBroadcastSpec::NONE)
-{
-    constructor_validate_and_infer_types();
-}
-
-shared_ptr<Node> op::ReluBackprop::clone_with_new_inputs(const OutputVector& new_args) const
-{
-    check_new_args_count(this, new_args);
-    return make_shared<ReluBackprop>(new_args.at(0), new_args.at(1));
-}
-
-void op::Relu::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-
-    auto backprop = make_shared<op::ReluBackprop>(output(0), delta);
-    adjoints.add_delta(input_value(0), backprop);
 }

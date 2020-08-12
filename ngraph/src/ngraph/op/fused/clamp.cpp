@@ -16,6 +16,7 @@
 #include "ngraph/op/fused/clamp.hpp"
 
 #include "ngraph/builder/make_constant.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/maximum.hpp"
 #include "ngraph/op/minimum.hpp"
 #include "ngraph/runtime/reference/clamp.hpp"
@@ -45,20 +46,6 @@ namespace
         bool rc = true;
         switch (arg->get_element_type())
         {
-            TYPE_CASE(i8)
-            (arg,
-             out,
-             double_to_int<int8_t>(min, ceil_func),
-             double_to_int<int8_t>(max, floor_func),
-             count);
-            break;
-            TYPE_CASE(i16)
-            (arg,
-             out,
-             double_to_int<int16_t>(min, ceil_func),
-             double_to_int<int16_t>(max, floor_func),
-             count);
-            break;
             TYPE_CASE(i32)
             (arg,
              out,
@@ -71,20 +58,6 @@ namespace
              out,
              double_to_int<int64_t>(min, ceil_func),
              double_to_int<int64_t>(max, floor_func),
-             count);
-            break;
-            TYPE_CASE(u8)
-            (arg,
-             out,
-             double_to_int<uint8_t>(min, ceil_func),
-             double_to_int<uint8_t>(max, floor_func),
-             count);
-            break;
-            TYPE_CASE(u16)
-            (arg,
-             out,
-             double_to_int<uint16_t>(min, ceil_func),
-             double_to_int<uint16_t>(max, floor_func),
              count);
             break;
             TYPE_CASE(u32)
@@ -103,12 +76,7 @@ namespace
             break;
             TYPE_CASE(f16)(arg, out, static_cast<float16>(min), static_cast<float16>(max), count);
             break;
-            TYPE_CASE(bf16)
-            (arg, out, static_cast<bfloat16>(min), static_cast<bfloat16>(max), count);
-            break;
             TYPE_CASE(f32)(arg, out, static_cast<float>(min), static_cast<float>(max), count);
-            break;
-            TYPE_CASE(f64)(arg, out, min, max, count);
             break;
         default: rc = false; break;
         }
@@ -116,8 +84,9 @@ namespace
     }
 }
 
-bool op::v0::Clamp::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Clamp::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Clamp::evaluate");
     return evaluate_clamp(
         inputs[0], outputs[0], get_min(), get_max(), shape_size(get_input_shape(0)));
 }
@@ -137,7 +106,7 @@ void op::Clamp::pre_validate_and_infer_types()
     set_output_type(0, get_input_element_type(0), get_input_partial_shape(0));
 }
 
-NodeVector op::Clamp::decompose_op() const
+OutputVector op::Clamp::decompose_op() const
 {
     const auto data = input_value(0);
     const auto type = data.get_element_type();

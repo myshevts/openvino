@@ -13,6 +13,7 @@
 #include <algorithm>
 
 #include <cpp/ie_cnn_network.h>
+#include <legacy/ie_layers.h>
 #include <cpp_interfaces/exception2status.hpp>
 #include <ie_blob.h>
 
@@ -177,6 +178,7 @@ public:
         DepthToSpace,
         SpaceToDepth,
         BatchToSpace,
+        SpaceToBatch,
         ShuffleChannels,
         StridedSlice,
         Broadcast,
@@ -189,6 +191,7 @@ public:
         TopK,
         Floor,
         Ceil,
+        Ceiling,
         Erf,
         HardSigmoid,
         Log,
@@ -199,6 +202,8 @@ public:
         SoftPlus,
         SoftSign,
         Swish,
+        HSwish,
+        Mish,
         Gelu,
         Sin,
         Sinh,
@@ -220,6 +225,7 @@ public:
         EmbeddingBagPackedSum,
         EmbeddingBagOffsetsSum,
         EmbeddingSegmentsSum,
+        ExtractImagePatches,
         NO_TYPE
     };
     using GenericBlobMap = std::map<cldnn::primitive_id, cldnn::primitive_id>;
@@ -358,6 +364,7 @@ private:
     void CreateDepthToSpacePrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
     void CreateSpaceToDepthPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
     void CreateBatchToSpacePrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
+    void CreateSpaceToBatchPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
     void CreateShuffleChannelsPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
     void CreateStridedSlicePrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
     void CreateBroadcastPrimitive(cldnn::topology &topology, InferenceEngine::CNNLayerPtr &layer);
@@ -380,6 +387,7 @@ private:
     void CreateEmbeddingBagPackedSumPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr& layer);
     void CreateEmbeddingBagOffsetsSumPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr& layer);
     void CreateEmbeddingSegmentsSumPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr& layer);
+    void CreateExtractImagePatchesPrimitive(cldnn::topology& topology, InferenceEngine::CNNLayerPtr &layer);
 };
 
 }  // namespace CLDNNPlugin

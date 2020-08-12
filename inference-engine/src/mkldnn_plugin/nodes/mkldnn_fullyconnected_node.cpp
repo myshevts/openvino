@@ -7,7 +7,7 @@
 #include "mkldnn_depthwise_node.h"
 #include "mkldnn_quantize_node.h"
 #include "desc_iterator.hpp"
-#include <ie_layers.h>
+#include <legacy/ie_layers.h>
 #include <string>
 #include <vector>
 #include <mkldnn_extension_utils.h>
@@ -208,6 +208,7 @@ void MKLDNNFullyConnectedNode::setPostOps(mkldnn::primitive_attr &attr, bool ini
 
                 PostOpsIntBlobMemory.push_back(MKLDNNMemoryPtr(new MKLDNNMemory(getEngine())));
                 PostOpsIntBlobMemory[blob_idx]->Create(depthwiseDims, memory::data_type::f32, memory::format::x);
+                PostOpsIntBlobMemory[blob_idx]->FillZero();
 
                 // In case ndims == 3 graph optimizer allows fusing only if all weights values are the same
                 if (depthwiseNode->isBroadcast() || ndims == 3) {
@@ -225,6 +226,7 @@ void MKLDNNFullyConnectedNode::setPostOps(mkldnn::primitive_attr &attr, bool ini
                 if (depthwiseNode->getAlgorithm() == depthwise_scale_shift) {
                     PostOpsIntBlobMemory.push_back(MKLDNNMemoryPtr(new MKLDNNMemory(getEngine())));
                     PostOpsIntBlobMemory[blob_idx + 1]->Create(depthwiseDims, memory::data_type::f32, memory::format::x);
+                    PostOpsIntBlobMemory[blob_idx + 1]->FillZero();
 
                     // In case ndims == 3 graph optimizer allows fusing only if all biases values are the same
                     if (depthwiseNode->isBroadcast() || ndims == 3) {

@@ -15,6 +15,7 @@
 //*****************************************************************************
 
 #include "ngraph/op/divide.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/multiply.hpp"
 #include "ngraph/op/negative.hpp"
 #include "ngraph/runtime/host_tensor.hpp"
@@ -59,22 +60,6 @@ shared_ptr<Node> op::v0::Divide::clone_with_new_inputs(const OutputVector& new_a
         new_args.at(0), new_args.at(1), this->is_pythondiv(), this->get_autob());
 }
 
-void op::v0::Divide::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    if (get_autob().m_type != op::AutoBroadcastType::NONE)
-    {
-        throw ngraph_error("Autodiff not supported with auto broadcasting");
-    }
-
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-    auto y = input_value(1);
-
-    adjoints.add_delta(x, delta / y);
-    adjoints.add_delta(y, -delta * shared_from_this() / y);
-}
-
 shared_ptr<Node> ngraph::operator/(const Output<Node>& arg0, const Output<Node>& arg1)
 {
     return make_shared<op::v0::Divide>(arg0, arg1);
@@ -109,29 +94,17 @@ namespace
         out->set_broadcast(broadcast_spec, arg0, arg1);
         switch (arg0->get_element_type())
         {
-            TYPE_CASE(i8)(arg0, arg1, out, broadcast_spec, pythondiv);
-            break;
-            TYPE_CASE(i16)(arg0, arg1, out, broadcast_spec, pythondiv);
-            break;
             TYPE_CASE(i32)(arg0, arg1, out, broadcast_spec, pythondiv);
             break;
             TYPE_CASE(i64)(arg0, arg1, out, broadcast_spec, pythondiv);
-            break;
-            TYPE_CASE(u8)(arg0, arg1, out, broadcast_spec, pythondiv);
-            break;
-            TYPE_CASE(u16)(arg0, arg1, out, broadcast_spec, pythondiv);
             break;
             TYPE_CASE(u32)(arg0, arg1, out, broadcast_spec, pythondiv);
             break;
             TYPE_CASE(u64)(arg0, arg1, out, broadcast_spec, pythondiv);
             break;
-            TYPE_CASE(bf16)(arg0, arg1, out, broadcast_spec, pythondiv);
-            break;
             TYPE_CASE(f16)(arg0, arg1, out, broadcast_spec, pythondiv);
             break;
             TYPE_CASE(f32)(arg0, arg1, out, broadcast_spec, pythondiv);
-            break;
-            TYPE_CASE(f64)(arg0, arg1, out, broadcast_spec, pythondiv);
             break;
         default: rc = false; break;
         }
@@ -139,14 +112,15 @@ namespace
     }
 }
 
-bool op::v0::Divide::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::v0::Divide::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Divide::evaluate");
     return evaluate_divide(inputs[0], inputs[1], outputs[0], get_autob(), is_pythondiv());
 }
 
 // ------------------------------ v1 -------------------------------------------
 
-constexpr NodeTypeInfo op::v1::Divide::type_info;
+NGRAPH_RTTI_DEFINITION(op::v1::Divide, "Divide", 1, util::BinaryElementwiseArithmetic);
 
 op::v1::Divide::Divide(const Output<Node>& arg0,
                        const Output<Node>& arg1,
@@ -180,23 +154,8 @@ shared_ptr<Node> op::v1::Divide::clone_with_new_inputs(const OutputVector& new_a
         new_args.at(0), new_args.at(1), this->is_pythondiv(), this->get_autob());
 }
 
-void op::v1::Divide::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
+bool op::v1::Divide::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
-    if (get_autob().m_type != op::AutoBroadcastType::NONE)
-    {
-        throw ngraph_error("Autodiff not supported with auto broadcasting");
-    }
-
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-    auto y = input_value(1);
-
-    adjoints.add_delta(x, delta / y);
-    adjoints.add_delta(y, -delta * shared_from_this() / y);
-}
-
-bool op::v1::Divide::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
-{
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v1::Divide::evaluate");
     return evaluate_divide(inputs[0], inputs[1], outputs[0], get_autob(), is_pythondiv());
 }

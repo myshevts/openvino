@@ -102,12 +102,9 @@ namespace ngraph
                 bool get_is_transpose() const { return m_is_transpose; }
                 void set_is_transpose(bool is_transpose) { m_is_transpose = is_transpose; }
                 bool evaluate(const HostTensorVector& outputs,
-                              const HostTensorVector& inputs) override;
+                              const HostTensorVector& inputs) const override;
 
             protected:
-                virtual void generate_adjoints(autodiff::Adjoints& adjoints,
-                                               const OutputVector& deltas) override;
-
                 AxisVector m_input_order;
                 Shape m_output_shape;
                 bool m_is_transpose{false};
@@ -124,8 +121,7 @@ namespace ngraph
             class NGRAPH_API Reshape : public Op
             {
             public:
-                static constexpr NodeTypeInfo type_info{"Reshape", 1};
-                const NodeTypeInfo& get_type_info() const override { return type_info; }
+                NGRAPH_RTTI_DECLARATION;
                 Reshape() = default;
                 /// \brief Constructs a dynamic reshape operation. This operation does not perform
                 ///        transpose.
@@ -152,13 +148,9 @@ namespace ngraph
                 bool get_special_zero() const { return m_special_zero; }
                 void set_special_zero(bool special_zero) { m_special_zero = special_zero; }
                 bool evaluate(const HostTensorVector& outputs,
-                              const HostTensorVector& inputs) override;
+                              const HostTensorVector& inputs) const override;
 
             protected:
-                virtual void generate_adjoints(autodiff::Adjoints& adjoints,
-                                               const OutputVector& deltas) override;
-
-            private:
                 bool m_special_zero;
             };
         }

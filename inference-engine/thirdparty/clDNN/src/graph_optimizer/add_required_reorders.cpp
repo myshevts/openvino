@@ -44,9 +44,6 @@ void add_required_reorders::add_reorder(program_impl& p, program_node* node, pro
     auto new_reorder = std::make_shared<reorder>(node->id() + "_reorder_" + usr->id(), node->id(), reorder_layout);
     auto& new_reorder_node = p.get_or_create(new_reorder);
 
-    // make sure that new_reorder_node has correct layout
-    new_reorder_node.set_output_layout(reorder_layout, false);
-
     // ToDo: add a method to program_impl class which adds an intermediate node given a node and its user
     auto it = std::find(usr->get_dependencies().begin(), usr->get_dependencies().end(), node);
     if (it == usr->get_dependencies().end()) {
@@ -78,19 +75,19 @@ void add_required_reorders::run(program_impl& p) {
 
         for (auto& node : usr->get_dependencies()) {
             if (!node->is_in_data_flow() && !weights_data) {
-                /*
-                    ToDo: Here we should handle also the situation where primitive usr has data inputs in different
-                   formats
-                */
-                layout current_layout(usr->get_output_layout().data_type,
-                                      node->get_output_layout().format,
-                                      usr->get_output_layout().size);
-                usr->set_output_layout(current_layout, false);
-                if (usr->type()->does_possible_implementation_exist(p.get_engine(), *usr)) {
-                    correct_layout_selected = true;
-                    break;
-                } else {
-                    if (original_layout.data_type == data_types::i64) {
+                if (cldnn::format::dimension(original_layout.format) == cldnn::format::dimension(node->get_output_layout().format)) {
+                    /*
+                        ToDo: Here we should handle also the situation where primitive usr has data inputs in different
+                       formats
+                    */
+                    layout current_layout(original_layout.data_type,
+                                          node->get_output_layout().format,
+                                          original_layout.size);
+                    usr->set_output_layout(current_layout, false);
+                    if (usr->type()->does_possible_implementation_exist(p.get_engine(), *usr)) {
+                        correct_layout_selected = true;
+                        break;
+                    } else if (original_layout.data_type == data_types::i64) {
                         // goal of this section is to use int32 implementation
                         // if int64 is not available for usr primitive
                         current_layout = original_layout;
@@ -98,7 +95,6 @@ void add_required_reorders::run(program_impl& p) {
                         usr->set_output_layout(current_layout, false);
                         if (usr->type()->does_possible_implementation_exist(p.get_engine(), *usr)) {
                             correct_layout_selected = true;
-                            break;
                         } else {
                             current_layout = original_layout;
                             current_layout.data_type = data_types::i32;
@@ -106,8 +102,26 @@ void add_required_reorders::run(program_impl& p) {
                             usr->set_output_layout(current_layout, false);
                             if (usr->type()->does_possible_implementation_exist(p.get_engine(), *usr)) {
                                 correct_layout_selected = true;
-                                break;
                             }
+                        }
+
+                        if (correct_layout_selected) {
+                            // change output_data_type field in usr to i32
+                            if ((static_cast<bool>(usr->get_primitive()->output_data_type) == true) &&
+                                (*(usr->get_primitive()->output_data_type) == data_types::i64)) {
+                                std::const_pointer_cast<primitive>(usr->get_primitive())->output_data_type = data_types::i32;
+                            }
+                            // add reorders between usr int32 output and inputs of its users
+                            auto next_usr_itr = usr->get_users().begin();
+                            while (next_usr_itr != usr->get_users().end()) {
+                                auto next_usr = *next_usr_itr++;
+                                if (!next_usr->is_type<reorder>()) {
+                                    if ((next_usr->get_output_layout() != usr->get_output_layout())) {
+                                        add_reorder(p, usr, next_usr);
+                                    }
+                                }
+                            }
+                            break;
                         }
                     }
                 }
@@ -125,7 +139,7 @@ void add_required_reorders::run(program_impl& p) {
 
         if (!correct_layout_selected) {
             std::vector<cldnn::format> preffered_layout_formats;
-            size_t max_in_dims = 4;
+            size_t max_in_dims = std::max(cldnn::format::dimension(original_layout.format), static_cast<size_t>(4));
             for (auto& node : usr->get_dependencies()) {
                 max_in_dims = std::max(cldnn::format::dimension(node->get_output_layout().format), max_in_dims);
             }
@@ -143,9 +157,9 @@ void add_required_reorders::run(program_impl& p) {
             }
 
             for (auto new_layout_format : preffered_layout_formats) {
-                layout current_layout(usr->get_output_layout().data_type,
+                layout current_layout(original_layout.data_type,
                                       new_layout_format,
-                                      usr->get_output_layout().size);
+                                      original_layout.size);
                 usr->set_output_layout(current_layout, false);
                 if (usr->type()->does_possible_implementation_exist(p.get_engine(), *usr)) {
                     correct_layout_selected = true;
@@ -185,7 +199,13 @@ void add_required_reorders::run(program_impl& p) {
                             " kernel which satisfies output format dependecies.");
                     }
 
-                    // add reorders between usr int32 outputs and inputs of its users
+                    // change output_data_type field in usr to i32
+                    if ((static_cast<bool>(usr->get_primitive()->output_data_type) == true) &&
+                        (*(usr->get_primitive()->output_data_type) == data_types::i64)) {
+                        std::const_pointer_cast<primitive>(usr->get_primitive())->output_data_type = data_types::i32;
+                    }
+
+                    // add reorders between usr int32 output and inputs of its users
                     auto next_usr_itr = usr->get_users().begin();
                     while (next_usr_itr != usr->get_users().end()) {
                         auto next_usr = *next_usr_itr++;

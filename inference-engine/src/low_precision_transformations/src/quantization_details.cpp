@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <blob_factory.hpp>
 #include <cmath>
-#include <details/caseless.hpp>
 #include <limits>
 #include <map>
 #include <memory>
@@ -18,9 +17,8 @@
 #include <vector>
 
 #include <ie_common.h>
-#include "cnn_network_impl.hpp"
-#include "ie_util_internal.hpp"
-#include <details/ie_cnn_network_tools.h>
+#include <legacy/cnn_network_impl.hpp>
+#include <legacy/ie_util_internal.hpp>
 #include "low_precision_transformations/common/ie_lpt_exception.hpp"
 #include "low_precision_transformations/network_helper.hpp"
 
@@ -136,7 +134,7 @@ void QuantizationDetails::getInputIntervals(
     if (inputLowData == nullptr) {
         THROW_IE_LPT_EXCEPTION(quantize) << "input low data is absent";
     }
-    const CNNLayerPtr inputLowLayer = inputLowData->getCreatorLayer().lock();
+    const CNNLayerPtr inputLowLayer = getCreatorLayer(inputLowData).lock();
     validate(inputLowLayer);
     const std::vector<float> inputLowBlobValues = getBlobValue(inputLowLayer);
     inputLowValues.insert(inputLowValues.end(), inputLowBlobValues.begin(), inputLowBlobValues.end());
@@ -145,7 +143,7 @@ void QuantizationDetails::getInputIntervals(
     if (inputHighData == nullptr) {
         THROW_IE_LPT_EXCEPTION(quantize) << "input high data is absent";
     }
-    const CNNLayerPtr inputHighLayer = inputHighData->getCreatorLayer().lock();
+    const CNNLayerPtr inputHighLayer = getCreatorLayer(inputHighData).lock();
     validate(inputHighLayer);
     const std::vector<float> inputHighBlobValues = getBlobValue(inputHighLayer);
     inputHighValues.insert(inputHighValues.end(), inputHighBlobValues.begin(), inputHighBlobValues.end());
@@ -170,7 +168,7 @@ void QuantizationDetails::getOutputIntervals(
     if (outputLowData == nullptr) {
         THROW_IE_LPT_EXCEPTION(quantize) << "output low data is absent";
     }
-    const CNNLayerPtr outputLowLayer = outputLowData->getCreatorLayer().lock();
+    const CNNLayerPtr outputLowLayer = getCreatorLayer(outputLowData).lock();
     validate(outputLowLayer);
     const std::vector<float>& outputLowBlobValues = getBlobValue(outputLowLayer);
     outputLowValues.insert(outputLowValues.end(), outputLowBlobValues.begin(), outputLowBlobValues.end());
@@ -179,7 +177,7 @@ void QuantizationDetails::getOutputIntervals(
     if (outputHighData == nullptr) {
         THROW_IE_LPT_EXCEPTION(quantize) << "output high data is absent";
     }
-    const CNNLayerPtr outputHighLayer = outputHighData->getCreatorLayer().lock();
+    const CNNLayerPtr outputHighLayer = getCreatorLayer(outputHighData).lock();
     validate(outputHighLayer);
     const std::vector<float> outputHighBlobValues = getBlobValue(outputHighLayer);
     outputHighValues.insert(outputHighValues.end(), outputHighBlobValues.begin(), outputHighBlobValues.end());

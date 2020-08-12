@@ -18,6 +18,7 @@
 #include <iostream>
 
 #include "ngraph/function.hpp"
+#include "ngraph/itt.hpp"
 #include "ngraph/op/constant.hpp"
 #include "ngraph/op/reshape.hpp"
 #include "ngraph/runtime/opt_kernel/reshape.hpp"
@@ -28,56 +29,17 @@ using namespace ngraph;
 
 namespace
 {
-    template <element::Type_t ET>
-    bool evaluate(const HostTensorPtr& arg0, const HostTensorPtr& out, const AxisVector& order)
-    {
-        auto data_ptr = out->get_data_ptr<ET>();
-        runtime::opt_kernel::reshape<typename element_type_traits<ET>::value_type>(
-            arg0->get_data_ptr<ET>(), data_ptr, arg0->get_shape(), order, out->get_shape());
-        return true;
-    }
-
     bool evaluate_reshape(const HostTensorPtr& arg0,
                           const HostTensorPtr& out,
                           const AxisVector& order)
     {
-        bool rc = true;
-        switch (arg0->get_element_type())
-        {
-        case element::Type_t::undefined: rc = false; break;
-        case element::Type_t::dynamic: rc = false; break;
-        case element::Type_t::u1:
-            rc = false;
-            break;
-            TYPE_CASE(bf16)(arg0, out, order);
-            break;
-            TYPE_CASE(f16)(arg0, out, order);
-            break;
-            TYPE_CASE(f32)(arg0, out, order);
-            break;
-            TYPE_CASE(f64)(arg0, out, order);
-            break;
-            TYPE_CASE(i8)(arg0, out, order);
-            break;
-            TYPE_CASE(i16)(arg0, out, order);
-            break;
-            TYPE_CASE(i32)(arg0, out, order);
-            break;
-            TYPE_CASE(i64)(arg0, out, order);
-            break;
-            TYPE_CASE(u8)(arg0, out, order);
-            break;
-            TYPE_CASE(u16)(arg0, out, order);
-            break;
-            TYPE_CASE(u32)(arg0, out, order);
-            break;
-            TYPE_CASE(u64)(arg0, out, order);
-            break;
-            TYPE_CASE(boolean)(arg0, out, order);
-            break;
-        default: rc = false; break;
-        }
-        return rc;
+        runtime::opt_kernel::reshape(arg0->get_data_ptr<char>(),
+                                     out->get_data_ptr<char>(),
+                                     arg0->get_shape(),
+                                     order,
+                                     out->get_shape(),
+                                     arg0->get_element_type().size());
+        return true;
     }
 
     template <element::Type_t ET>
@@ -190,45 +152,14 @@ bool op::Reshape::visit_attributes(AttributeVisitor& visitor)
     return true;
 }
 
-void op::Reshape::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
+bool op::v0::Reshape::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
-    auto delta = deltas.at(0);
-
-    auto x_shape = get_input_shape(0);
-    auto x_rank = x_shape.size();
-    Shape permuted_x_shape(x_rank);
-    AxisVector x_input_order(x_rank);
-    bool is_permuted = false;
-    for (size_t i = 0; i < x_rank; ++i)
-    {
-        size_t permuted_i = m_input_order[i];
-        if (i != permuted_i)
-        {
-            is_permuted = true;
-        }
-        permuted_x_shape[i] = x_shape[permuted_i];
-        x_input_order[permuted_i] = i;
-    }
-    AxisVector input_order(m_output_shape.size());
-    for (size_t i = 0; i < m_output_shape.size(); i++)
-    {
-        input_order[i] = i;
-    }
-    auto reshape = make_shared<op::Reshape>(delta, input_order, permuted_x_shape);
-    if (is_permuted)
-    {
-        reshape = make_shared<op::Reshape>(reshape, x_input_order, x_shape);
-    }
-
-    adjoints.add_delta(input_value(0), reshape);
-}
-
-bool op::v0::Reshape::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
-{
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v0::Reshape::evaluate");
     return evaluate_reshape(inputs[0], outputs[0], get_input_order());
 }
 
-constexpr NodeTypeInfo op::v1::Reshape::type_info;
+NGRAPH_RTTI_DEFINITION(op::v1::Reshape, "Reshape", 1);
 
 op::v1::Reshape::Reshape(const Output<Node>& arg, const Output<Node>& pattern, bool zero_flag)
     : Op({arg, pattern})
@@ -284,6 +215,10 @@ void op::v1::Reshape::validate_and_infer_types()
         if (!(zero_dims && m_special_zero) && !negative_dims)
         {
             auto output_shape = const_shape->get_shape_val();
+            if (output_shape == Shape{0})
+            {
+                output_shape = Shape{};
+            }
             if (get_input_partial_shape(0).is_static())
             {
                 NODE_VALIDATION_CHECK(this,
@@ -371,6 +306,14 @@ void op::v1::Reshape::validate_and_infer_types()
                     }
                 }
             }
+
+            if (out_shape_val == std::vector<std::int64_t>{0, -1} &&
+                input_pshape.rank().is_static() && input_pshape.rank().get_length() == 2)
+            {
+                partial_shape[0] = input_pshape[0];
+                partial_shape[1] = input_pshape[1];
+            }
+
             set_output_type(0, get_input_element_type(0), PartialShape(partial_shape));
         }
     }
@@ -386,14 +329,11 @@ shared_ptr<Node> op::v1::Reshape::clone_with_new_inputs(const OutputVector& new_
     return make_shared<v1::Reshape>(new_args.at(0), new_args.at(1), m_special_zero);
 }
 
-void op::v1::Reshape::generate_adjoints(autodiff::Adjoints& /* adjoints */,
-                                        const OutputVector& /* deltas */)
+bool op::v1::Reshape::evaluate(const HostTensorVector& outputs,
+                               const HostTensorVector& inputs) const
 {
-    throw ngraph_error("generate_adjoints not implemented for Reshape");
-}
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::v1::Reshape::evaluate");
 
-bool op::v1::Reshape::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
-{
     // infer and set output shape if the output shape contain -1
     // and zero value dimension
     size_t output_rank = inputs[1]->get_shape()[0];
@@ -508,6 +448,6 @@ bool op::v1::Reshape::evaluate(const HostTensorVector& outputs, const HostTensor
         }
         outputs[0]->set_shape(output_shape);
     }
-    const AxisVector order = get_default_order(outputs[0]->get_shape());
+    const AxisVector order = get_default_order(inputs[0]->get_shape());
     return evaluate_reshape(inputs[0], outputs[0], order);
 }

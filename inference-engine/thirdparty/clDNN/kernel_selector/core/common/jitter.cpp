@@ -557,8 +557,6 @@ JitConstants MakeActivationJitConstants(ActivationFunction activation_function,
     };
 
     std::string macro_def = name + (use_type_parameter ? "(jit_type, input, m, n)" : "(input, m, n)");
-    std::string macro_def_grad = name + (use_type_parameter ? "(jit_type, input_grad, input, m, n)"
-                                                            : "(input_grad, input, m, n)");
     std::string macro_def_params = use_type_parameter ? "(jit_type, input, params)" : "(input, params)";
 
     jitConstants.AddConstant(MakeJitConstant("ACTIVATION_PARAMS" + suffix, "NL_M" + suffix + ", NL_N" + suffix));
@@ -656,25 +654,6 @@ JitConstants MakeActivationJitConstants(ActivationFunction activation_function,
             jitConstants.AddConstant(MakeJitConstant(macro_def, "(pow(input," + m.str() + "))"));
             break;
         }
-        case ActivationFunction::RELU_GRAD:
-            jitConstants.AddConstant(MakeJitConstant(
-                macro_def_grad,
-                ("input_grad"_jit * ternary(input.gt(zero), one, zero)).str()));
-            macro_def_params = use_type_parameter ? "(jit_type, input_grad, input, params)" : "(input_grad, input, params)";
-            break;
-        case ActivationFunction::RELU_NEGATIVE_SLOPE_GRAD: {
-            const JitTerm slope = disable_type_conversion ? "m"_jit : to_type("m"_jit);
-            jitConstants.AddConstant(MakeJitConstant(
-                macro_def_grad,
-                ("input_grad"_jit * (ternary(input.gt(zero), one, zero) + (to_type(slope) * ternary(input.le(zero), one, zero))))
-                    .str()));
-            macro_def_params = use_type_parameter ? "(jit_type, input_grad, input, params)" : "(input_grad, input, params)";
-            break;
-        }
-        case ActivationFunction::NONE_GRAD:
-            jitConstants.AddConstant(MakeJitConstant(macro_def_grad, "input_grad"));
-            macro_def_params = use_type_parameter ? "(jit_type, input_grad, input, params)" : "(input_grad, input, params)";
-            break;
         case ActivationFunction::TAN:
             jitConstants.AddConstant(MakeJitConstant(macro_def, "(tan(input))"));
             break;
@@ -736,6 +715,27 @@ JitConstants MakeActivationJitConstants(ActivationFunction activation_function,
             jitConstants.AddConstant(MakeJitConstant(
                     macro_def,
                     (input / (one + exp(neg(input)))).str()));
+            break;
+        }
+        case ActivationFunction::HSWISH: {
+            std::string type_suffix = out_dt == Datatype::F32 ? "f" : "h";
+            const JitTerm three("3." + type_suffix);
+            const JitTerm six("6." + type_suffix);
+            jitConstants.AddConstant(MakeJitConstant(
+                    macro_def,
+                    (input * min_func(max_func(zero, input + three), six) / six).str()));
+            break;
+        }
+        case ActivationFunction::MISH: {
+            std::string type_suffix = out_dt == Datatype::F32 ? "f" : "h";
+            auto bound = out_dt == Datatype::F32 ? "9.9f"_jit : "4.75h"_jit;
+            const JitTerm two("2." + type_suffix);
+            const JitTerm n((exp(input) + two) * exp(input));
+            const JitTerm common_mish_formula((input * n) / (n + two));
+
+            jitConstants.AddConstant(MakeJitConstant(
+                macro_def,
+                ternary(input.ge(bound), input, common_mish_formula).str()));
             break;
         }
         case ActivationFunction::GELU: {
@@ -986,23 +986,14 @@ JitConstants MakeActivationJitConstants(std::vector<kernel_selector::base_activa
         res.Merge(jitConstants);
 
         if (i == 0) {
-            if (params[i].gradient) {
-                activation_params = use_type_parameter ? "(jit_type, input_grad, input, params)" : "(input_grad, input, params)";
-            } else {
-                activation_params = use_type_parameter ? "(jit_type, input, params)" : "(input, params)";
-            }
+            activation_params = use_type_parameter ? "(jit_type, input, params)" : "(input, params)";
             res_activation = "ACTIVATION_FUNC" + activation_suffix + activation_params;
         } else {
             res_activation = "ACTIVATION" + activation_suffix + "(" + (use_type_parameter ? "jit_type, " : "") +
-                             (params[i].gradient ? "input_grad, " : "") +
                              res_activation + ", ACTIVATION_PARAMS" + activation_suffix + ")";
         }
     }
-    if (params[params.size() - 1].gradient) {
-        activation_params = use_type_parameter ? "(jit_type, input_grad, input, params)" : "(input_grad, input, params)";
-    } else {
-        activation_params = use_type_parameter ? "(jit_type, input, params)" : "(input, params)";
-    }
+    activation_params = use_type_parameter ? "(jit_type, input, params)" : "(input, params)";
     res.AddConstant(MakeJitConstant("ACTIVATION_PARAMS" + suffix, "ACTIVATION_PARAMS" + suffix + "_0"));
     res.AddConstant(MakeJitConstant("ACTIVATION" + suffix + activation_params, res_activation));
     return res;
@@ -1093,6 +1084,7 @@ JitConstants FusedOpsCodeGenerator::MakeLoadJitConstants(const FusedOpsConfigura
 
     auto vec_size = conf.vec_size;
     auto idx = conf.bfzyx_idx_order;
+    auto fused_op_config = conf;
 
     std::string load_decls = "";
     static int i = 0;
@@ -1103,11 +1095,19 @@ JitConstants FusedOpsCodeGenerator::MakeLoadJitConstants(const FusedOpsConfigura
     if (reuse_index) {
         load_decls += "\\\n\tint " + reused_idx + " = " +  GetIdx(0, idx_desc{idx, desc.tensors[0]}, safe_load) + ";";
     }
+    // TODO: add some generic way to support shuffled feature, lets say possibility to add separate config for each fused op
+    if (desc.GetType() == KernelType::ELTWISE && conf.load_type == FusedOpsConfiguration::LoadType::FEATURE_SHUFFLE) {
+        std::string sub_group_local_id_str = "get_sub_group_local_id()";
+        size_t found_sub = conf.bfzyx_idx_order[1].rfind(sub_group_local_id_str);
+        if (found_sub != std::string::npos)
+            fused_op_config.bfzyx_idx_order[1].replace(found_sub, sub_group_local_id_str.length(), fused_op_config.shuffle_var_name);
+    }
 
     for (auto op_input_id : GetRequiredInputs()) {
         load_decls += "\\\n\t" + GetInputTypeName(op_input_id, vec_size) + " " + GetInputVarName(op_input_id) + " = " +
-                      GetJitLoad(conf, op_input_id, prim_output, reuse_index, reused_idx) + ";";
+                      GetJitLoad(fused_op_config, op_input_id, prim_output, reuse_index, reused_idx) + ";";
     }
+
     jit.AddConstant(MakeJitConstant("FUSED_OP"+std::to_string(desc.op_id)+"_LOAD" + conf.suffix, load_decls));
 
     return jit;
@@ -1121,13 +1121,20 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
     std::string op_decls = "";
     auto vec_size = conf.vec_size;
     auto idx = conf.bfzyx_idx_order;
+    std::string shuffle_var = conf.shuffle_var_name;
+    bool is_shuffled = false;
 
     out_var = GetOutputVarName(in_var);
     out_type = desc.output_tensor.GetDType();
 
+    if (conf.load_type == FusedOpsConfiguration::LoadType::FEATURE_SHUFFLE &&
+        (desc.GetType() == KernelType::SCALE || desc.GetType() == KernelType::QUANTIZE)) {
+        is_shuffled = true;
+    }
+
     std::vector<std::string> in_vars_converted;
     for (size_t i = 0; i < desc.tensors.size(); i++) {
-        auto in_name = GetInputVarName(i);
+        auto in_name = GetInputVarName(i, is_shuffled, shuffle_var);
         if (desc.tensors[0].GetDType() != desc.output_tensor.GetDType()) {
             in_name = ConvertToOutputType(in_name, vec_size);
         }
@@ -1144,8 +1151,25 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
             break;
         }
         case KernelType::ELTWISE: {
+            auto p = desc.GetOpParams<eltwise_fuse_params>();
+            if (!p)
+                throw std::runtime_error("[clDNN] Eltwise fuse params can't be nullptr");
+
+            std::string op = "";
+            switch (p->mode)
+            {
+            case kernel_selector::EltwiseMode::ADD:
+                op = "+";
+                break;
+            case kernel_selector::EltwiseMode::MUL:
+                op = "*";
+                break;
+            default:
+                throw std::runtime_error("[clDNN] Eltwise mode is not supported in fused ops codegen");
+            }
+
             op_decls += "\\\n\t" + GetOutputType(vec_size) + " " + out_var + " = " + in_vars_converted[0] +
-                        " + " + ConvertToOutputType(in_var, vec_size) + ";";
+                        op + ConvertToOutputType(in_var, vec_size) + ";";
             break;
         }
         case KernelType::QUANTIZE: {
@@ -1163,17 +1187,17 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
             }
 
             auto post_scale = p->per_tensor_output_scale ? Broadcast(std::to_string(p->out_scale), tmp_type, vec_size)
-                                                         : ConvertToType(GetInputVarName(p->out_scale_idx), tmp_type, vec_size);
+                                                         : ConvertToType(GetInputVarName(p->out_scale_idx, is_shuffled, shuffle_var), tmp_type, vec_size);
             auto post_shift = p->per_tensor_output_shift ? Broadcast(std::to_string(p->out_shift), tmp_type, vec_size)
-                                                         : ConvertToType(GetInputVarName(p->out_shift_idx), tmp_type, vec_size);
+                                                         : ConvertToType(GetInputVarName(p->out_shift_idx, is_shuffled, shuffle_var), tmp_type, vec_size);
             auto pre_scale = p->per_tensor_input_scale ? Broadcast(std::to_string(p->in_scale), tmp_type, vec_size)
-                                                       : ConvertToType(GetInputVarName(p->in_scale_idx), tmp_type, vec_size);
+                                                       : ConvertToType(GetInputVarName(p->in_scale_idx, is_shuffled, shuffle_var), tmp_type, vec_size);
             auto pre_shift = p->per_tensor_input_shift ? Broadcast(std::to_string(p->in_shift), tmp_type, vec_size)
-                                                       : ConvertToType(GetInputVarName(p->in_shift_idx), tmp_type, vec_size);
+                                                       : ConvertToType(GetInputVarName(p->in_shift_idx, is_shuffled, shuffle_var), tmp_type, vec_size);
             auto in_lo = p->per_tensor_input_range ? Broadcast(std::to_string(p->in_lo), tmp_type, vec_size)
-                                                   : ConvertToType(GetInputVarName(p->in_range_lo_idx), tmp_type, vec_size);
+                                                   : ConvertToType(GetInputVarName(p->in_range_lo_idx, is_shuffled, shuffle_var), tmp_type, vec_size);
             auto in_hi = p->per_tensor_input_range ? Broadcast(std::to_string(p->in_hi), tmp_type, vec_size)
-                                                   : ConvertToType(GetInputVarName(p->in_range_hi_idx), tmp_type, vec_size);
+                                                   : ConvertToType(GetInputVarName(p->in_range_hi_idx, is_shuffled, shuffle_var), tmp_type, vec_size);
 
             if (p->has_clamp) {
                 op_decls += "\\\n\t" + tmp_type_str + " " + tmp_var + " = min(max(" + in_lo + ", " + in_converted + "), " + in_hi + ");";
@@ -1274,15 +1298,13 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
     auto& input_tensor = desc.tensors[input_id];
     size_t vec_size = 1;
     auto input_dt = input_tensor.GetDType();
-    if (desc.GetType() == KernelType::ELTWISE) {
-        if (input_tensor.LogicalSize() == prim_output.LogicalSize() &&
-            input_tensor.GetLayout() != prim_output.GetLayout() && conf.vec_size > 1) {
-            throw std::runtime_error("[clDNN] Mixed layouts of input tensors are not supported in fused eltwise");
-        }
-        vec_size = conf.vec_size;
+
+    if (desc.GetType() == KernelType::ELTWISE &&
+        input_tensor.GetLayout() != prim_output.GetLayout() && conf.vec_size > 1) {
+        throw std::runtime_error("[clDNN] Mixed layouts of input tensors are not supported in fused eltwise");
     }
 
-    if (conf.vec_axis == Tensor::DataChannelName::FEATURE &&
+    if (conf.vec_axis != Tensor::DataChannelName::COUNT &&
         DataTensor::Extract(input_tensor.GetLayout(), conf.vec_axis, input_tensor.GetDims()).v != 1) {
         vec_size = conf.vec_size;
     }
@@ -1353,7 +1375,10 @@ std::string FusedOpsCodeGenerator::GetInputPtrName(size_t input_id) const {
     return GetTypeStr() + std::to_string(desc.op_id) + "_input" + std::to_string(input_id);
 }
 
-std::string FusedOpsCodeGenerator::GetInputVarName(size_t input_id) const {
+std::string FusedOpsCodeGenerator::GetInputVarName(size_t input_id, bool is_shuffled, std::string shuffle_var) const {
+    if (is_shuffled)
+        return "intel_sub_group_shuffle(" + GetTypeStr() + std::to_string(desc.op_id) + "_data" +
+               std::to_string(input_id) + ", " + shuffle_var + ")";
     return GetTypeStr() + std::to_string(desc.op_id) + "_data" + std::to_string(input_id);
 }
 

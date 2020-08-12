@@ -21,12 +21,14 @@
 
 #include <gmock/gmock-more-actions.h>
 #include "gmock/gmock.h"
-#include "net_pass.h"
+#include <legacy/net_pass.h>
 #include "matchers/input_data_matcher.hpp"
 #include <blob_factory.hpp>
-#include <details/ie_cnn_network_tools.h>
+#include <ie_core.hpp>
+#include <legacy/details/ie_cnn_network_tools.h>
 
 #include "unit_test_utils/mocks/mock_icnn_network.hpp"
+#include <legacy/details/ie_cnn_network_iterator.hpp>
 
 using namespace std;
 using namespace InferenceEngine;
@@ -92,7 +94,9 @@ void GNAPropagateMatcher :: match() {
 
             std::vector<InferenceEngine::CNNLayerPtr> tiBodies;
 
-            for (auto &layer : net_original) {
+            for (auto layerIt = details::CNNNetworkIterator(net_original), end = details::CNNNetworkIterator();
+                     layerIt != end; ++layerIt) {
+                auto layer = *layerIt;
                 if (layer->type == "TensorIterator") {
                     auto tiBody = NetPass::TIBodySortTopologically(std::dynamic_pointer_cast<InferenceEngine::TensorIterator>(layer)->body);
                     tiBodies.insert(tiBodies.end(), tiBody.begin(), tiBody.end());

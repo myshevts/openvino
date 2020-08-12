@@ -14,9 +14,11 @@
 // limitations under the License.
 //*****************************************************************************
 
-#include "ngraph/op/sinh.hpp"
+#include "ngraph/itt.hpp"
+
 #include "ngraph/op/cosh.hpp"
 #include "ngraph/op/multiply.hpp"
+#include "ngraph/op/sinh.hpp"
 
 #include "ngraph/runtime/host_tensor.hpp"
 #include "ngraph/runtime/reference/sinh.hpp"
@@ -43,15 +45,6 @@ shared_ptr<Node> op::Sinh::clone_with_new_inputs(const OutputVector& new_args) c
     return make_shared<Sinh>(new_args.at(0));
 }
 
-void op::Sinh::generate_adjoints(autodiff::Adjoints& adjoints, const OutputVector& deltas)
-{
-    auto delta = deltas.at(0);
-
-    auto x = input_value(0);
-
-    adjoints.add_delta(x, delta * (make_shared<op::Cosh>(x)));
-}
-
 namespace
 {
     template <element::Type_t ET>
@@ -71,29 +64,17 @@ namespace
         {
             TYPE_CASE(boolean)(arg0, out, count);
             break;
-            TYPE_CASE(i8)(arg0, out, count);
-            break;
-            TYPE_CASE(i16)(arg0, out, count);
-            break;
             TYPE_CASE(i32)(arg0, out, count);
             break;
             TYPE_CASE(i64)(arg0, out, count);
-            break;
-            TYPE_CASE(u8)(arg0, out, count);
-            break;
-            TYPE_CASE(u16)(arg0, out, count);
             break;
             TYPE_CASE(u32)(arg0, out, count);
             break;
             TYPE_CASE(u64)(arg0, out, count);
             break;
-            TYPE_CASE(bf16)(arg0, out, count);
-            break;
             TYPE_CASE(f16)(arg0, out, count);
             break;
             TYPE_CASE(f32)(arg0, out, count);
-            break;
-            TYPE_CASE(f64)(arg0, out, count);
             break;
         default: rc = false; break;
         }
@@ -101,7 +82,8 @@ namespace
     }
 }
 
-bool op::Sinh::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs)
+bool op::Sinh::evaluate(const HostTensorVector& outputs, const HostTensorVector& inputs) const
 {
+    OV_ITT_SCOPED_TASK(itt::domains::nGraphOp, "op::Sinh::evaluate");
     return evaluate_sinh(inputs[0], outputs[0], shape_size(get_output_shape(0)));
 }

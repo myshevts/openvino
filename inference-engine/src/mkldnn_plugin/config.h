@@ -21,7 +21,8 @@ struct Config {
     bool collectPerfCounters = false;
     bool exclusiveAsyncRequests = false;
     bool enableDynamicBatch = false;
-    int  dynamicSequence = 128;
+    int  dynamicSequence = 0;
+    int  dynamicSequenceStep = 0;
     std::string dumpToDot = "";
     std::string dumpQuantizedGraphToDot = "";
     std::string dumpQuantizedGraphToIr = "";

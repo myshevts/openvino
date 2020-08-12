@@ -174,7 +174,7 @@ Engine::LoadExeNetworkImpl(const InferenceEngine::ICNNNetwork &network,
         if (conf.dynamicSequence) {
             for (const InputsDataMap::value_type &item : inputInfo)
                 shapes[item.first][1] = seq;
-            std::cout << "Reshaped network by sequence to  " << seq << std::endl;
+                // std::cout << "Reshaped network by sequence to  " << seq << std::endl;
             clonedNetwork.reshape(shapes);
         }
         bool is_transformed = false;
@@ -200,7 +200,7 @@ Engine::LoadExeNetworkImpl(const InferenceEngine::ICNNNetwork &network,
             }
         }
         reshapedNetworks[seq] = clonedNetwork;
-        seq -= 128;
+        seq -= conf.dynamicSequenceStep;
     } while (conf.dynamicSequence && seq >= conf.dynamicSequence);
 
     return std::make_shared<MKLDNNExecNetwork>(reshapedNetworks, conf, extensionManager, weightsSharing);

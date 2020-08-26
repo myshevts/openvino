@@ -26,7 +26,6 @@
 
 namespace InferenceEngine {
 static std::map<IStreamsExecutor::NetworkPriority, int> sThreadPriorityMap = {
-                { IStreamsExecutor::NetworkPriority::PRIORITY_BACKGROUND   , THREAD_MODE_BACKGROUND_BEGIN},
                 { IStreamsExecutor::NetworkPriority::PRIORITY_LOWEST       , THREAD_PRIORITY_LOWEST},
                 { IStreamsExecutor::NetworkPriority::PRIORITY_BELOW_NORMAL , THREAD_PRIORITY_BELOW_NORMAL},
                 { IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL       , THREAD_PRIORITY_NORMAL},
@@ -79,12 +78,13 @@ struct CPUStreamsExecutor::Impl {
             }
             void on_scheduler_entry(bool) override {
                 auto pri = sThreadPriorityMap[_priority];
-                auto cur_pri = GetThreadPriority(GetCurrentThread());
+                auto handle = GetCurrentThread();
+                auto cur_pri = GetThreadPriority(handle);
                 if (cur_pri != pri)
-                    if (!SetThreadPriority(GetCurrentThread(), pri))
+                    if (!SetThreadPriority(handle, pri))
                         ErrorExit("SetThreadPriority");
-                    //else
-                    //    std::cout << "OK SetThreadPriority" << std::endl;
+                    // else
+                    //  std::cout << "OK SetThreadPriority" << std::endl;
             }
             void on_scheduler_exit(bool) override {
                 // todo

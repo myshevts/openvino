@@ -47,7 +47,6 @@ public:
      * @brief Defines network priority
      */
     enum NetworkPriority{
-        PRIORITY_BACKGROUND,
         PRIORITY_LOWEST,
         PRIORITY_BELOW_NORMAL,
         PRIORITY_NORMAL,

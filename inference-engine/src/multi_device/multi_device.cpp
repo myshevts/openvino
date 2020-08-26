@@ -205,7 +205,7 @@ void MultiDeviceExecutableNetwork::ScheduleToWorkerInferRequest() {
             IdleGuard idleGuard{workerRequestPtr, idleWorkerRequests};
             Task inferPipelineTask;
             if (_inferPipelineTasks.try_pop(inferPipelineTask)) {
-                _statsPerDevice[device.first]++;
+                _statsPerDevice[device.deviceName]++;
                 _thisWorkerInferRequest = workerRequestPtr;
                 inferPipelineTask();
                 idleGuard.Release();

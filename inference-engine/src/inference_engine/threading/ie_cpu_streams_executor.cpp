@@ -12,6 +12,7 @@
 #include <atomic>
 #include <climits>
 #include <cassert>
+#include <algorithm>
 #include <utility>
 #include <windows.h>
 #include <strsafe.h>
@@ -27,7 +28,6 @@ using namespace openvino;
 
 namespace InferenceEngine {
 static std::map<IStreamsExecutor::NetworkPriority, int> sThreadPriorityMap = {
-                { IStreamsExecutor::NetworkPriority::PRIORITY_BACKGROUND   , THREAD_MODE_BACKGROUND_BEGIN},
                 { IStreamsExecutor::NetworkPriority::PRIORITY_LOWEST       , THREAD_PRIORITY_LOWEST},
                 { IStreamsExecutor::NetworkPriority::PRIORITY_BELOW_NORMAL , THREAD_PRIORITY_BELOW_NORMAL},
                 { IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL       , THREAD_PRIORITY_NORMAL},
@@ -80,12 +80,13 @@ struct CPUStreamsExecutor::Impl {
             }
             void on_scheduler_entry(bool) override {
                 auto pri = sThreadPriorityMap[_priority];
-                auto cur_pri = GetThreadPriority(GetCurrentThread());
+                auto handle = GetCurrentThread();
+                auto cur_pri = GetThreadPriority(handle);
                 if (cur_pri != pri)
-                    if (!SetThreadPriority(GetCurrentThread(), pri))
+                    if (!SetThreadPriority(handle, pri))
                         ErrorExit("SetThreadPriority");
-                    //else
-                    //    std::cout << "OK SetThreadPriority" << std::endl;
+                     else
+                      std::cout << "OK SetThreadPriority" << std::endl;
             }
             void on_scheduler_exit(bool) override {
                 // todo
@@ -140,12 +141,13 @@ struct CPUStreamsExecutor::Impl {
             auto concurrency = (0 == _impl->_config._threadsPerStream) ? tbb::task_arena::automatic : _impl->_config._threadsPerStream;
             if (ThreadBindingType::NUMA == _impl->_config._threadBindingType) {
 #if TBB_INTERFACE_VERSION >= 11100  // TBB has numa aware task_arena api
-		// TODO: this is experiment for Windows, pls revert numa back!!!
-                //_taskArena.reset(new tbb::task_arena{tbb::task_arena::constraints{_numaNodeId, concurrency}});
+        		// TODO: this is experiment for Windows, pls revert numa back!!!
+                // _taskArena.reset(new tbb::task_arena{tbb::task_arena::constraints{_numaNodeId, concurrency}});
                 _taskArena.reset(new tbb::task_arena{concurrency});
                 if (IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL != _impl->_config._priority) {
                     _observer.reset(new PriorityObserver{ *_taskArena, _impl->_config._priority });
                     _observer->observe(true);
+                }
 #else
                 _taskArena.reset(new tbb::task_arena{concurrency});
 #endif
@@ -224,7 +226,7 @@ struct CPUStreamsExecutor::Impl {
         auto numaNodes = getAvailableNUMANodes();
         if (_config._streams != 0) {
             std::copy_n(std::begin(numaNodes),
-                        std::min(static_cast<std::size_t>(_config._streams), numaNodes.size()),
+                        min(static_cast<std::size_t>(_config._streams), numaNodes.size()),
                         std::back_inserter(_usedNumaNodes));
         } else {
             _usedNumaNodes = numaNodes;

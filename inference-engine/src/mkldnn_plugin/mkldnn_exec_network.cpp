@@ -110,7 +110,7 @@ MKLDNNExecNetwork::MKLDNNExecNetwork(const InferenceEngine::ICNNNetwork &network
     } else {
         auto streamsExecutorConfig = InferenceEngine::IStreamsExecutor::Config::MakeDefaultMultiThreaded(_cfg.streamExecutorConfig);
         streamsExecutorConfig._name = "CPUStreamsExecutor";
-        streamExecutorConfig._priority = IStreamsExecutor::NetworkPriority::PRIORITY_BACKGROUND;
+        streamsExecutorConfig._priority = IStreamsExecutor::NetworkPriority::PRIORITY_LOWEST;
         _taskExecutor = ExecutorManager::getInstance()->getIdleCPUStreamsExecutor(streamsExecutorConfig);
 
     }

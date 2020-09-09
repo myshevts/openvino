@@ -25,16 +25,15 @@ namespace MultiDevicePlugin {
 // ------------------------------MultiDeviceInferRequest----------------------------
 MultiDeviceInferRequest::MultiDeviceInferRequest(const InputsDataMap&   networkInputs,
                                                  const OutputsDataMap&  networkOutputs,
-                                                 ExecutableNetwork network_to_share_blobs)
+                                                 InferenceEngine::InferRequest request_to_share_blobs)
         : InferRequestInternal(networkInputs, networkOutputs) {
         // Allocate all input blobs
-        if ((IExecutableNetwork::Ptr)network_to_share_blobs) {
+        if (request_to_share_blobs) {
             // borrow device-friendly blobs from the request
-            auto tmp = network_to_share_blobs.CreateInferRequest();
             for (const auto &it : _networkInputs)
-                _inputs[it.first] = tmp.GetBlob(it.first);
+                _inputs[it.first] = request_to_share_blobs.GetBlob(it.first);
             for (const auto &it : _networkOutputs)
-                _outputs[it.first] = tmp.GetBlob(it.first);
+                _outputs[it.first] = request_to_share_blobs.GetBlob(it.first);
             std::cout << "BORROW!!!" << std::endl;
         } else {
             for (const auto &it : networkInputs) {
@@ -244,11 +243,11 @@ MultiDeviceExecutableNetwork::~MultiDeviceExecutableNetwork() {
 
 InferenceEngine::InferRequestInternal::Ptr MultiDeviceExecutableNetwork::CreateInferRequestImpl(InferenceEngine::InputsDataMap networkInputs,
                                                                                                 InferenceEngine::OutputsDataMap networkOutputs) {
-    ExecutableNetwork network_to_share_blobs;
-    auto res = _networksPerDevice.find(_deviceToShareBlobs);
-    if (res != _networksPerDevice.end())
-        network_to_share_blobs = res->second;
-    return std::make_shared<MultiDeviceInferRequest>(networkInputs, networkOutputs, network_to_share_blobs);
+    InferenceEngine::InferRequest request_to_share_blobs;
+    auto res = _workerRequests.find(_deviceToShareBlobs);
+    if (res != _workerRequests.end())
+        request_to_share_blobs = res->second.begin()->_inferRequest;
+    return std::make_shared<MultiDeviceInferRequest>(networkInputs, networkOutputs, request_to_share_blobs);
 }
 
 void MultiDeviceExecutableNetwork::CreateInferRequest(IInferRequest::Ptr& asyncRequest) {

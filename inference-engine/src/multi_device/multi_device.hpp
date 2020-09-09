@@ -44,7 +44,7 @@ public:
     using Ptr = std::shared_ptr<MultiDeviceInferRequest>;
     explicit MultiDeviceInferRequest(const InferenceEngine::InputsDataMap&  networkInputs,
                                      const InferenceEngine::OutputsDataMap& networkOutputs,
-                                     ExecutableNetwork network_to_share_blobs);
+                                     InferenceEngine::InferRequest request_to_share_blobs);
     void GetPerformanceCounts(std::map<std::string, InferenceEngineProfileInfo>&) const override {
         THROW_IE_EXCEPTION << NOT_IMPLEMENTED_str;
     }

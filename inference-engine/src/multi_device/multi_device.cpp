@@ -24,28 +24,39 @@ namespace MultiDevicePlugin {
     using namespace InferenceEngine;
 // ------------------------------MultiDeviceInferRequest----------------------------
 MultiDeviceInferRequest::MultiDeviceInferRequest(const InputsDataMap&   networkInputs,
-                                                 const OutputsDataMap&  networkOutputs)
+                                                 const OutputsDataMap&  networkOutputs,
+                                                 ExecutableNetwork network_to_share_blobs)
         : InferRequestInternal(networkInputs, networkOutputs) {
-    // Allocate all input blobs
-    for (const auto &it : networkInputs) {
-        Layout l = it.second->getLayout();
-        Precision p = it.second->getPrecision();
-        SizeVector dims = it.second->getTensorDesc().getDims();
+        // Allocate all input blobs
+        if ((IExecutableNetwork::Ptr)network_to_share_blobs) {
+            // borrow device-friendly blobs from the request
+            auto tmp = network_to_share_blobs.CreateInferRequest();
+            for (const auto &it : _networkInputs)
+                _inputs[it.first] = tmp.GetBlob(it.first);
+            for (const auto &it : _networkOutputs)
+                _outputs[it.first] = tmp.GetBlob(it.first);
+            std::cout << "BORROW!!!" << std::endl;
+        } else {
+            for (const auto &it : networkInputs) {
+                Layout l = it.second->getLayout();
+                Precision p = it.second->getPrecision();
+                SizeVector dims = it.second->getTensorDesc().getDims();
 
-        TensorDesc desc = TensorDesc(p, dims, l);
-        _inputs[it.first] = make_blob_with_precision(desc);
-        _inputs[it.first]->allocate();
-    }
-    // Allocate all output blobs
-    for (const auto &it : networkOutputs) {
-        Layout l = it.second->getLayout();
-        Precision p = it.second->getPrecision();
-        SizeVector dims = it.second->getTensorDesc().getDims();
+                TensorDesc desc = TensorDesc(p, dims, l);
+                _inputs[it.first] = make_blob_with_precision(desc);
+                _inputs[it.first]->allocate();
+            }
+            // Allocate all output blobs
+            for (const auto &it : networkOutputs) {
+                Layout l = it.second->getLayout();
+                Precision p = it.second->getPrecision();
+                SizeVector dims = it.second->getTensorDesc().getDims();
 
-        TensorDesc desc = TensorDesc(p, dims, l);
-        _outputs[it.first] = make_blob_with_precision(desc);
-        _outputs[it.first]->allocate();
-    }
+                TensorDesc desc = TensorDesc(p, dims, l);
+                _outputs[it.first] = make_blob_with_precision(desc);
+                _outputs[it.first]->allocate();
+            }
+        }
 }
 
 void MultiDeviceInferRequest::SetBlobsToAnotherRequest(InferRequest& req) {
@@ -233,7 +244,11 @@ MultiDeviceExecutableNetwork::~MultiDeviceExecutableNetwork() {
 
 InferenceEngine::InferRequestInternal::Ptr MultiDeviceExecutableNetwork::CreateInferRequestImpl(InferenceEngine::InputsDataMap networkInputs,
                                                                                                 InferenceEngine::OutputsDataMap networkOutputs) {
-    return std::make_shared<MultiDeviceInferRequest>(networkInputs, networkOutputs);
+    ExecutableNetwork network_to_share_blobs;
+    auto res = _networksPerDevice.find(_deviceToShareBlobs);
+    if (res != _networksPerDevice.end())
+        network_to_share_blobs = res->second;
+    return std::make_shared<MultiDeviceInferRequest>(networkInputs, networkOutputs, network_to_share_blobs);
 }
 
 void MultiDeviceExecutableNetwork::CreateInferRequest(IInferRequest::Ptr& asyncRequest) {

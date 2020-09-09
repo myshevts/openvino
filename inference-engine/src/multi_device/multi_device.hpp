@@ -43,7 +43,8 @@ class MultiDeviceInferRequest : public InferenceEngine::InferRequestInternal {
 public:
     using Ptr = std::shared_ptr<MultiDeviceInferRequest>;
     explicit MultiDeviceInferRequest(const InferenceEngine::InputsDataMap&  networkInputs,
-                                     const InferenceEngine::OutputsDataMap& networkOutputs);
+                                     const InferenceEngine::OutputsDataMap& networkOutputs,
+                                     ExecutableNetwork network_to_share_blobs);
     void GetPerformanceCounts(std::map<std::string, InferenceEngineProfileInfo>&) const override {
         THROW_IE_EXCEPTION << NOT_IMPLEMENTED_str;
     }
@@ -125,6 +126,7 @@ public:
     DeviceMap<std::vector<WorkerInferRequest>>                  _workerRequests;
     std::unordered_map<std::string, InferenceEngine::Parameter> _config;
     bool                                                        _needPerfCounters = false;
+    std::string                                                 _deviceToShareBlobs = "GPU";
 };
 
 class MultiDeviceAsyncInferRequest : public InferenceEngine::AsyncInferRequestThreadSafeDefault {

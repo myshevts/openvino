@@ -139,36 +139,11 @@ struct CPUStreamsExecutor::Impl {
                 : _impl->_usedNumaNodes.at(_streamId % _impl->_usedNumaNodes.size());
 #if IE_THREAD == IE_THREAD_TBB || IE_THREAD == IE_THREAD_TBB_AUTO
             auto concurrency = (0 == _impl->_config._threadsPerStream) ? tbb::task_arena::automatic : _impl->_config._threadsPerStream;
-            if (ThreadBindingType::NUMA == _impl->_config._threadBindingType) {
-#if TBB_INTERFACE_VERSION >= 11100  // TBB has numa aware task_arena api
-        		// TODO: this is experiment for Windows, pls revert numa back!!!
-                // _taskArena.reset(new tbb::task_arena{tbb::task_arena::constraints{_numaNodeId, concurrency}});
                 _taskArena.reset(new tbb::task_arena{concurrency});
                 if (IStreamsExecutor::NetworkPriority::PRIORITY_NORMAL != _impl->_config._priority) {
                     _observer.reset(new PriorityObserver{ *_taskArena, _impl->_config._priority });
                     _observer->observe(true);
                 }
-#else
-                _taskArena.reset(new tbb::task_arena{concurrency});
-#endif
-            } else if ((0 != _impl->_config._threadsPerStream) || (ThreadBindingType::CORES == _impl->_config._threadBindingType)) {
-                _taskArena.reset(new tbb::task_arena{concurrency});
-                if (ThreadBindingType::CORES == _impl->_config._threadBindingType) {
-                     CpuSet processMask;
-                    int    ncpus = 0;
-                    std::tie(processMask, ncpus) = GetProcessMask();
-                    if (nullptr != processMask) {
-                        _observer.reset(new Observer{*_taskArena,
-                                                     std::move(processMask),
-                                                     ncpus,
-                                                     _streamId,
-                                                     _impl->_config._threadsPerStream,
-                                                     _impl->_config._threadBindingStep,
-                                                     _impl->_config._threadBindingOffset});
-                        _observer->observe(true);
-                    }
-                }
-            }
 #elif IE_THREAD == IE_THREAD_OMP
             omp_set_num_threads(_impl->_config._threadsPerStream);
             if (!checkOpenMpEnvVars(false) && (ThreadBindingType::NONE != _impl->_config._threadBindingType)) {

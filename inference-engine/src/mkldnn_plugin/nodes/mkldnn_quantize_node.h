@@ -28,7 +28,7 @@ struct jit_quantize_params {
     InferenceEngine::Precision wei_prc;
     InferenceEngine::Precision dst_prc;
 
-    mkldnn::memory::format src_format;
+    mkldnn::memory::format_tag src_format;
 
     QuantizeOpType op_type;
 };
@@ -62,6 +62,8 @@ struct jit_uni_quantize_kernel {
 
     explicit jit_uni_quantize_kernel(jit_quantize_params jqp) : ker_(nullptr), jqp_(jqp) {}
     virtual ~jit_uni_quantize_kernel() {}
+
+    virtual void create_ker() = 0;
 
     jit_quantize_params jqp_;
 };

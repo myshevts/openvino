@@ -209,12 +209,12 @@ public:
         implementationType = type;
     }
 
-    PrimitiveDescInfo(const InferenceEngine::LayerConfig conf, impl_desc_type type, std::vector<mkldnn::memory::format> outFmts): config(conf) {
+    PrimitiveDescInfo(const InferenceEngine::LayerConfig conf, impl_desc_type type, std::vector<mkldnn::memory::format_tag> outFmts): config(conf) {
         implementationType = type;
         outputLayouts = outFmts;
     }
 
-    PrimitiveDescInfo(const InferenceEngine::LayerConfig conf, impl_desc_type type, mkldnn::memory::format outFmt): config(conf) {
+    PrimitiveDescInfo(const InferenceEngine::LayerConfig conf, impl_desc_type type, mkldnn::memory::format_tag outFmt): config(conf) {
         implementationType = type;
 
         setOutputLayouts(outFmt);
@@ -236,7 +236,7 @@ public:
         return implementationType;
     }
 
-    const std::vector<mkldnn::memory::format>& getOutputLayouts() const {
+    const std::vector<mkldnn::memory::format_tag>& getOutputLayouts() const {
         return outputLayouts;
     }
 
@@ -244,7 +244,7 @@ public:
         implementationType = type;
     }
 
-    void setOutputLayouts(mkldnn::memory::format outFmt) {
+    void setOutputLayouts(mkldnn::memory::format_tag outFmt) {
         outputLayouts.clear();
 
         for (int i = 0; i < config.outConfs.size(); i++) {
@@ -255,7 +255,7 @@ public:
 private:
     InferenceEngine::LayerConfig config;
     impl_desc_type implementationType;
-    std::vector<mkldnn::memory::format> outputLayouts;
+    std::vector<mkldnn::memory::format_tag> outputLayouts;
 };
 
 class MKLDNNNode : public InferenceEngine::details::no_copy {
@@ -459,7 +459,7 @@ public:
         for (const auto& desc : descs) {
             auto itpd = desc.createPrimitiveDescriptorIterator(engine, attr);
 
-            while (itpd.is_not_end())  {
+            while (static_cast<bool>(itpd))  {
                 std::vector<InferenceEngine::TensorDesc> srcDescs;
                 for (size_t i = 0; i < descInputNumbers(desc); i++)
                     srcDescs.push_back(getSrcMemDesc(itpd, i));
@@ -468,17 +468,17 @@ public:
                 for (size_t i = 0; i < descOutputNumbers(desc); i++)
                     dstDescs.push_back(getDstMemDesc(itpd, i));
 
-                impl_desc_type impl_type = parse_impl_name(itpd.get_impl_info_str());
+                impl_desc_type impl_type = parse_impl_name(itpd.impl_info_str());
 
                 if (impl_type == selected_pd->getImplementationType() &&
                     descsEqual(srcDescs, selected_pd->getConfig().inConfs) &&
                     descsEqual(dstDescs, selected_pd->getConfig().outConfs)) {
                     prepareMemory(selected_pd, itpd);
                     PD prim_desc = createPd<PD, D, FPD>(desc);
-                    itpd.getPrimitiveDescriptor(prim_desc);
-                    return prim_desc;
+                    return {itpd.get()};
                 }
-                itpd++;
+                if (!itpd.next_impl())
+                    break;
             }
         }
 
@@ -548,8 +548,8 @@ protected:
     std::vector <MKLDNNNodePtr> fusedWith;
     std::vector <MKLDNNNodePtr> mergedWith;
     std::vector <impl_desc_type> implPriorities;
-    std::vector <mkldnn_memory_format_t> inputMemoryFormatsFilter;
-    std::vector <mkldnn_memory_format_t> outputMemoryFormatsFilter;
+    std::vector <mkldnn::memory::format_tag> inputMemoryFormatsFilter;
+    std::vector <mkldnn::memory::format_tag> outputMemoryFormatsFilter;
 
     std::string originalLayers;  // contains names of the original layers separated by comma
 
@@ -585,7 +585,7 @@ protected:
 
     virtual const std::vector<impl_desc_type>& getPrimitivesPriority();
 
-    std::vector<mkldnn::memory::format> getAvailableFormatsForDims(const MKLDNNDims& dims) const;
+    std::vector<mkldnn::memory::format_tag> getAvailableFormatsForDims(const MKLDNNDims& dims) const;
     int batchToProcess();
 
     InferenceEngine::Blob::Ptr createInternalBlob(InferenceEngine::SizeVector dims, bool weights, bool is_grouped = false);
@@ -665,16 +665,5 @@ public:
 #define REG_MKLDNN_CONCAT(X, Y) REG_MKLDNN_CONCAT2(X, Y)
 #define REG_MKLDNN_PRIM_FOR(__prim, __type) \
 static MKLDNNNode::Registrar<__prim> REG_MKLDNN_CONCAT(_reg_, __LINE__)(__type)
-
-template <typename T, typename U>
-inline T div_up(const T a, const U b) {
-    assert(b);
-    return (a + b - 1) / b;
-}
-
-template <typename T, typename U>
-inline T rnd_up(const T a, const U b) {
-    return div_up(a, b) * b;
-}
 
 }  // namespace MKLDNNPlugin

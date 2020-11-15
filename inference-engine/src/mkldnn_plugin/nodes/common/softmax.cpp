@@ -2,15 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <vector>
-#include <algorithm>
-#include <ie_parallel.hpp>
-#include "jit_generator.hpp"
-#include "jit_uni_eltwise.hpp"
 #include "softmax.h"
 
+#include <ie_parallel.hpp>
+#include <cpu/x64/jit_generator.hpp>
+#include <cpu/x64/jit_uni_eltwise_injector.hpp>
+#include <mkldnn.hpp>  // TODO: just to replace mkldnn->dnnl via macros
+
+#include <algorithm>
+#include <cassert>
+
 using namespace InferenceEngine;
-using namespace mkldnn::impl::cpu;
+using namespace mkldnn::impl::cpu::x64;
 using namespace mkldnn::impl::utils;
 
 #define GET_OFF(field) offsetof(jit_args_softmax, field)
@@ -29,14 +32,23 @@ struct jit_uni_softmax_kernel {
 
     jit_uni_softmax_kernel() : ker_(nullptr) {}
     virtual ~jit_uni_softmax_kernel() {}
+
+    virtual void create_ker() = 0;
 };
 
 template <cpu_isa_t isa>
 struct jit_uni_softmax_kernel_f32 : public jit_uni_softmax_kernel, public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_softmax_kernel_f32)
 
-    jit_uni_softmax_kernel_f32() : jit_uni_softmax_kernel(), jit_generator() {
-        exp_injector.reset(new jit_uni_eltwise_injector_f32<isa>(this, alg_kind::eltwise_exp, 0.f, 0.f));
+    jit_uni_softmax_kernel_f32() : jit_uni_softmax_kernel(), jit_generator() {}
+
+    void create_ker() override {
+        jit_generator::create_kernel();
+        ker_ = (decltype(ker_))jit_ker();
+    }
+
+    void generate() override {
+        exp_injector.reset(new jit_uni_eltwise_injector_f32<isa>(this, mkldnn::impl::alg_kind::eltwise_exp, 0.f, 0.f, 1.0f));
 
         this->preamble();
 
@@ -61,7 +73,7 @@ struct jit_uni_softmax_kernel_f32 : public jit_uni_softmax_kernel, public jit_ge
 
             uni_vmovups(vmm_val, ptr[aux_reg_src]);
 
-            if (isa == sse42) {
+            if (isa == sse41) {
                 uni_vmovups(vmm_mask, vmm_val);
                 uni_vcmpgtps(vmm_mask, vmm_mask, vmm_max);
             } else if (isa == avx2) {
@@ -133,12 +145,10 @@ struct jit_uni_softmax_kernel_f32 : public jit_uni_softmax_kernel, public jit_ge
         this->postamble();
 
         exp_injector->prepare_table();
-
-        ker_ = (decltype(ker_))this->getCode();
     }
 
 private:
-    using Vmm = typename conditional3<isa == sse42, Xbyak::Xmm, isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
+    using Vmm = typename conditional3<isa == sse41, Xbyak::Xmm, isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
     size_t vlen = cpu_isa_traits<isa>::vlen;
 
     Xbyak::Reg64 reg_src = r8;
@@ -168,10 +178,12 @@ SoftmaxGeneric::SoftmaxGeneric() {
     } else if (mayiuse(avx2)) {
         softmax_kernel.reset(new jit_uni_softmax_kernel_f32<avx2>());
         block_size = 8;
-    } else if (mayiuse(sse42)) {
-        softmax_kernel.reset(new jit_uni_softmax_kernel_f32<sse42>());
+    } else if (mayiuse(sse41)) {
+        softmax_kernel.reset(new jit_uni_softmax_kernel_f32<sse41>());
         block_size = 4;
     }
+    if (softmax_kernel)
+        softmax_kernel->create_ker();
 }
 
 void SoftmaxGeneric::execute(const float *src_data, float *dst_data, int B, int C, int H, int W) {

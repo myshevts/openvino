@@ -6,11 +6,12 @@
 
 #include <ie_common.h>
 #include <mkldnn_node.h>
+#include <common/primitive_attr.hpp>
+
 #include <string>
 #include <memory>
 #include <vector>
 #include <utility>
-#include <primitive_attr.hpp>
 
 namespace MKLDNNPlugin {
 
@@ -27,7 +28,7 @@ public:
 
     size_t getAxis() const { return axis; }
 
-    bool isBinarization() const { return quantizeAlgorithm == mkldnn::algorithm::binarization_depthwise; }
+    bool isBinarization() const { return false; /*return quantizeAlgorithm == mkldnn::algorithm::binarization_depthwise;*/ }
     mkldnn::algorithm getAlgorithm() const { return quantizeAlgorithm; }
 
     const float* getBinarizationTresholdsPtr() const { return &binarizationThresholds[0]; }
@@ -61,7 +62,7 @@ public:
 
 private:
     void init() override;
-    std::vector<mkldnn::memory::format> getDataFormats() const;
+    std::vector<mkldnn::memory::format_tag> getDataFormats() const;
 
     int levels = -1;
 
@@ -94,7 +95,7 @@ private:
     InferenceEngine::Precision inputPrecision = InferenceEngine::Precision::FP32;
     InferenceEngine::Precision outputPrecision = InferenceEngine::Precision::FP32;
 
-    mkldnn::algorithm quantizeAlgorithm = mkldnn::algorithm::algorithm_undef;
+    mkldnn::algorithm quantizeAlgorithm = mkldnn::algorithm::undef;
 };
 
 }  // namespace MKLDNNPlugin

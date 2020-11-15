@@ -9,10 +9,15 @@
 #include <algorithm>
 #include <memory>
 #include <ie_parallel.hpp>
-#include "jit_generator.hpp"
-#include "jit_uni_eltwise.hpp"
 
-using namespace mkldnn::impl::cpu;
+#include "mkldnn.hpp"
+
+
+#include <cpu/x64/jit_generator.hpp>
+#include <cpu/x64/jit_uni_eltwise_injector.hpp>
+
+
+using namespace mkldnn::impl::cpu::x64;
 using namespace mkldnn::impl::utils;
 
 namespace InferenceEngine {
@@ -32,6 +37,8 @@ struct jit_uni_logistic_kernel {
 
     void operator()(const jit_args_logistic *args) { assert(ker_); ker_(args); }
 
+    virtual void create_ker() = 0;
+
     jit_uni_logistic_kernel() : ker_(nullptr) {}
     virtual ~jit_uni_logistic_kernel() {}
 };
@@ -40,8 +47,15 @@ template <cpu_isa_t isa>
 struct jit_uni_logistic_kernel_f32 : public jit_uni_logistic_kernel, public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_logistic_kernel_f32)
 
-    jit_uni_logistic_kernel_f32() : jit_uni_logistic_kernel(), jit_generator() {
-        exp_injector.reset(new jit_uni_eltwise_injector_f32<isa>(this, alg_kind::eltwise_exp, 0.f, 0.f));
+    jit_uni_logistic_kernel_f32() : jit_uni_logistic_kernel(), jit_generator() {}
+
+    void create_ker() override {
+        jit_generator::create_kernel();
+        ker_ = (decltype(ker_))jit_ker();
+    }
+
+    void generate() override {
+        exp_injector.reset(new jit_uni_eltwise_injector_f32<isa>(this, mkldnn::impl::alg_kind::eltwise_exp, 0.f, 0.f, 1.f));
 
         this->preamble();
 
@@ -93,12 +107,10 @@ struct jit_uni_logistic_kernel_f32 : public jit_uni_logistic_kernel, public jit_
         exp_injector->prepare_table();
 
         prepare_table();
-
-        ker_ = (decltype(ker_))this->getCode();
     }
 
 private:
-    using Vmm = typename conditional3<isa == sse42, Xbyak::Xmm, isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
+    using Vmm = typename conditional3<isa == sse41, Xbyak::Xmm, isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
     size_t vlen = cpu_isa_traits<isa>::vlen;
 
     Xbyak::Address table_val(int index) { return ptr[reg_table + index * vlen]; }
@@ -135,7 +147,7 @@ private:
         uni_vmovups(vmm_aux2, table_val(1));
         uni_vsubps(vmm_aux2, vmm_aux2, vmm_src);
 
-        if (isa == sse42) {
+        if (isa == sse41) {
             uni_vblendvps(vmm_aux2, vmm_aux2, vmm_src, vmm_aux0);
             uni_vmovups(vmm_src, vmm_aux2);
         } else if (isa == avx2) {
@@ -186,12 +198,15 @@ public:
             } else if (mayiuse(avx2)) {
                 logistic_kernel.reset(new jit_uni_logistic_kernel_f32<avx2>());
                 block_size = 8;
-            } else if (mayiuse(sse42)) {
-                logistic_kernel.reset(new jit_uni_logistic_kernel_f32<sse42>());
+            } else if (mayiuse(sse41)) {
+                logistic_kernel.reset(new jit_uni_logistic_kernel_f32<sse41>());
                 block_size = 4;
             }
 
             softmax_kernel.reset(new SoftmaxGeneric());
+
+            if (logistic_kernel)
+                logistic_kernel->create_ker();
 
             addConfig(layer, {DataConfigurator(ConfLayout::PLN)}, {DataConfigurator(ConfLayout::PLN)});
         } catch (InferenceEngine::details::InferenceEngineException &ex) {

@@ -4,7 +4,7 @@
 
 #include "embedding_bag_sum.hpp"
 #include "ie_parallel.hpp"
-#include "jit_generator.hpp"
+#include <cpu/x64/jit_generator.hpp>
 #include "list.hpp"
 
 #include <set>

@@ -174,6 +174,7 @@ MKLDNNDescriptor::operator std::shared_ptr<mkldnn::lbr_gru_forward::desc>() {
     }
     return typeDesc->getPtr();
 }
+
 MKLDNNDescriptor::MKLDNNDescriptor(std::shared_ptr<mkldnn::eltwise_forward::desc> desc) {
     this->desc.reset(new DescFwdImpl<mkldnn::eltwise_forward::desc>(desc));
 }
@@ -186,4 +187,3 @@ MKLDNNDescriptor::operator std::shared_ptr<mkldnn::eltwise_forward::desc>() {
     }
     return typeDesc->getPtr();
 }
-

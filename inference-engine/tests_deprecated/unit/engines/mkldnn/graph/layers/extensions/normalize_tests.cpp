@@ -283,7 +283,7 @@ protected:
     }
 };
 
-TEST_P(MKLDNNCPUExtNormalizeTests, TestsNormalize) {}
+TEST_P(MKLDNNCPUExtNormalizeTests, DISABLED_TestsNormalize) {}
 
 INSTANTIATE_TEST_CASE_P(
         TestsNormalize, MKLDNNCPUExtNormalizeTests,

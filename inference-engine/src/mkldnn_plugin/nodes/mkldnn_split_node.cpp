@@ -331,7 +331,7 @@ void MKLDNNSplitNode::selectOptimalPrimitiveDescriptor() {
         }
     }
 
-    std::map<mkldnn::memory::format_tag, size_t> formatFrequency;
+    std::map<PartialBlkDesc, size_t> formatFrequency;
     for (size_t i = 0; i < getParentEdges().size(); i++) {
         auto parentEdge = getParentEdgeAt(i);
         auto parent = parentEdge->getParent();
@@ -344,37 +344,51 @@ void MKLDNNSplitNode::selectOptimalPrimitiveDescriptor() {
             THROW_IE_EXCEPTION << "Cannot find index of output node";
         if (outputIndex >= parent->getSelectedPrimitiveDescriptor()->getConfig().outConfs.size())
             outputIndex = 0;
-        auto outDesc = MKLDNNMemoryDesc(parent->getSelectedPrimitiveDescriptor()->getConfig().outConfs[outputIndex].desc);
-        if (!outDesc)
+
+        auto parent_pdesc = parent->getSelectedPrimitiveDescriptor();
+        const auto &parent_config = parent_pdesc->getConfig();
+        const auto &port_desc = parent_config.outConfs[outputIndex].desc;
+        if (port_desc.getLayout() == Layout::ANY)
             continue;
-        if (formatFrequency.find(outDesc.getFormat()) != formatFrequency.end())
-            formatFrequency[outDesc.getFormat()] += 1;
-        else
-            formatFrequency[outDesc.getFormat()] = 1;
+
+        auto partial_format_desc = PartialBlkDesc::extractFrom(port_desc);
+        formatFrequency[partial_format_desc] += 1;
     }
     for (size_t i = 0; i < getChildEdges().size(); i++) {
         auto childEdge = getChildEdgeAt(i);
         auto child = childEdge->getChild();
-        if (child->getSelectedPrimitiveDescriptor() == nullptr)
+        const auto *prim_desc = child->getSelectedPrimitiveDescriptor();
+        if (prim_desc == nullptr)
             continue;
+
         int inputIndex = childEdge->getOutputNum();
-        if (inputIndex < 0)
+        if (inputIndex < 0 || inputIndex >= prim_desc->getConfig().inConfs.size())
             THROW_IE_EXCEPTION << "Cannot find index of output node";
-        if (inputIndex >= child->getSelectedPrimitiveDescriptor()->getConfig().inConfs.size())
-            inputIndex = 0;
-        auto outDesc = MKLDNNMemoryDesc(child->getSelectedPrimitiveDescriptor()->getConfig().inConfs[inputIndex].desc);
-        if (!outDesc)
+
+
+        const auto &config = prim_desc->getConfig();
+        const auto &port_desc = config.inConfs[inputIndex].desc;
+        if (port_desc.getLayout() == Layout::ANY)
             continue;
-        if (formatFrequency.find(outDesc.getFormat()) != formatFrequency.end())
-            formatFrequency[outDesc.getFormat()] += 1;
-        else
-            formatFrequency[outDesc.getFormat()] = 1;
+
+        auto partial_format_desc = PartialBlkDesc::extractFrom(port_desc);
+        formatFrequency[partial_format_desc] = 1;
     }
 
+    const auto full_shape = getParentEdgeAt(0)->getDims().ToSizeVector();
+    std::vector<SizeVector> all_shapes {full_shape};
+    for (const auto &ch : getChildEdges()) {
+        all_shapes.push_back(ch.lock()->getDims().ToSizeVector());
+    }
+
+    const auto plain_pDesc = PartialBlkDesc::makePlain(full_shape);
+    const auto block8_pDesc = PartialBlkDesc::makeCBlocked(full_shape, 8);
+    const auto block16_pDesc = PartialBlkDesc::makeCBlocked(full_shape, 16);
+
     size_t maxCount = 0;
-    mkldnn::memory::format_tag convertTo = MKLDNNMemory::GetPlainFormat(getParentEdgeAt(0)->getDims());
+    auto convertTo = plain_pDesc;
     for (auto &it : formatFrequency) {
-        if (it.second > maxCount && !MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, it.first).blocksExtended()) {
+        if (it.second > maxCount && !it.first.isAutoExtendedWith(getParentEdgeAt(0)->getDims().ToSizeVector())) {
             maxCount = it.second;
             convertTo = it.first;
         }
@@ -382,9 +396,8 @@ void MKLDNNSplitNode::selectOptimalPrimitiveDescriptor() {
 
     // This logic is needed to cover cases when Split node cannot be optimized out for particular block size
     // In general it is significantly better to have additional reorders in graph than to use reference Split implementation
-    if (convertTo == memory::format_tag::nChw16c || convertTo == memory::format_tag::nCdhw16c ||
-        convertTo == memory::format_tag::nChw8c || convertTo == memory::format_tag::nCdhw8c) {
-        int blockSize = convertTo == memory::format_tag::nChw16c || convertTo == memory::format_tag::nCdhw16c ? 16 : 8;
+    if (convertTo == block16_pDesc || convertTo == block8_pDesc) {
+        int blockSize = convertTo == block16_pDesc ? 16 : 8;
         bool shouldDecreaseBlockSize = false;
         for (auto& parentEdge : getParentEdges()) {
             if (parentEdge.lock()->getDims()[1] % blockSize != 0)
@@ -410,22 +423,22 @@ void MKLDNNSplitNode::selectOptimalPrimitiveDescriptor() {
             }
 
             if (canDecreaseBlockSize)
-                convertTo = getParentEdgeAt(0)->getDims().ndims() == 5 ? memory::format_tag::nCdhw8c : memory::format_tag::nChw8c;
+                convertTo = block8_pDesc;
             else
-                convertTo = MKLDNNMemory::GetPlainFormat(getParentEdgeAt(0)->getDims());
+                convertTo = PartialBlkDesc::makePlain(full_shape);
         }
     }
 
-    if (canOptimize && MKLDNNMemoryDesc(getParentEdgeAt(0)->getDims(), inputDataType, convertTo).blocksExtended())
+    if (canOptimize && convertTo.isAutoExtendedWith(full_shape))
         canOptimize = false;
     for (size_t i = 0; canOptimize && i < getChildEdges().size(); i++) {
-        if (MKLDNNMemoryDesc(getChildEdgeAt(i)->getDims(), outputDataType, convertTo).blocksExtended())
+        if (convertTo.isAutoExtendedWith(getChildEdgeAt(i)->getDims().ToSizeVector()))
             canOptimize = false;
     }
 
     if (canOptimize) {
         for (auto supportedPdIndex : canSelectPrimitive) {
-            if (MKLDNNMemoryDesc(supportedPrimitiveDescriptors[supportedPdIndex].getConfig().inConfs[0].desc).getFormat() == convertTo) {
+            if (PartialBlkDesc::extractFrom(supportedPrimitiveDescriptors[supportedPdIndex].getConfig().inConfs[0].desc) == convertTo) {
                 selectPrimitiveDescriptorByIndex(static_cast<int>(supportedPdIndex));
                 return;
             }
@@ -436,10 +449,10 @@ void MKLDNNSplitNode::selectOptimalPrimitiveDescriptor() {
         auto &primDescInfo = supportedPrimitiveDescriptors[i];
         if (primDescInfo.getImplementationType() == impl_desc_type::unknown)
             continue;
-        if (convertTo == MKLDNNMemoryDesc(supportedPrimitiveDescriptors[i].getConfig().outConfs[0].desc).getFormat()) {
+        if (convertTo == PartialBlkDesc::extractFrom(supportedPrimitiveDescriptors[i].getConfig().outConfs[0].desc)) {
             size_t num = 0;
             for (num = 0; num < getParentEdges().size(); num++) {
-                if (MKLDNNMemoryDesc(getParentEdgeAt(num)->getDims(), inputDataType, convertTo).blocksExtended())
+                if (convertTo.isAutoExtendedWith(getParentEdgeAt(num)->getDims().ToSizeVector()))
                     break;
             }
             if (num == getParentEdges().size()) {
@@ -526,7 +539,7 @@ void MKLDNNSplitNode::setDynamicBatchLim(int lim) {
 
     dynBatchLim = lim;
     if (prim) {
-        prim.setBatchLimit(batchToProcess(), getParentEdges().size(), getChildEdges().size());
+//        prim.setBatchLimit(batchToProcess(), getParentEdges().size(), getChildEdges().size());
     }
 }
 REG_MKLDNN_PRIM_FOR(MKLDNNSplitNode, Split);

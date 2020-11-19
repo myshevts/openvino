@@ -470,9 +470,11 @@ void MKLDNNGraph::InitEdges() {
             inArgs += (inArgs.empty() ? "" : "_") + std::string(parentDesc.getPrecision().name());
             outArgs += (outArgs.empty() ? "" : "_") + std::string(childDesc.getPrecision().name());
         }
-        if (MKLDNNMemoryDesc(parentDesc).getFormat() != MKLDNNMemoryDesc(childDesc).getFormat()) {
-            inArgs += (inArgs.empty() ? "" : "_") + MKLDNNMemory::formatToString(MKLDNNMemoryDesc(parentDesc).getFormat());
-            outArgs += (outArgs.empty() ? "" : "_") + MKLDNNMemory::formatToString(MKLDNNMemoryDesc(childDesc).getFormat());
+        auto fmt_tag_src = MKLDNNMemoryDesc(parentDesc).getFormat();
+        auto fmt_tag_dst = MKLDNNMemoryDesc(parentDesc).getFormat();
+        if (fmt_tag_src != fmt_tag_dst || one_of(mkldnn::memory::format_tag::undef, fmt_tag_src, fmt_tag_dst)) {
+            inArgs += (inArgs.empty() ? "" : "_") + MKLDNNMemory::formatToString(fmt_tag_src);
+            outArgs += (outArgs.empty() ? "" : "_") + MKLDNNMemory::formatToString(fmt_tag_dst);
         }
         return inArgs + "_" + outArgs;
     };

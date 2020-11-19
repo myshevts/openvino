@@ -127,6 +127,15 @@ PartialBlkDesc PartialBlkDesc::makePlain(const InferenceEngine::SizeVector &dims
     return res;
 }
 
+PartialBlkDesc PartialBlkDesc::makeCBlocked(const InferenceEngine::SizeVector &dims, size_t block_size) {
+    PartialBlkDesc res;
+    res.outer_order.resize(dims.size());
+    std::iota(res.outer_order.begin(), res.outer_order.end(), 0);
+    res.inner_blk_size = {block_size};
+    res.inner_blk_idxes = {1};
+    return res;
+}
+
 PartialBlkDesc PartialBlkDesc::extractFrom(const InferenceEngine::TensorDesc &desc) {
     const auto &dims = desc.getDims();
     const auto &blk = desc.getBlockingDesc();

@@ -144,7 +144,7 @@ if (THREADING STREQUAL "TBB" OR THREADING STREQUAL "TBB_AUTO")
             endif()
             message(STATUS "THIRDPARTY_SERVER_PATH=${IE_PATH_TO_DEPS}")
      	RESOLVE_DEPENDENCY(TBB
-                    ARCHIVE_WIN "oneapi-tbb-2021.1-hybrid-cpu-v01.zip"
+                    ARCHIVE_WIN "oneapi-tbb-2021.1-hybrid-cpu-v02.zip"
                     TARGET_PATH "${TEMP}/tbb"
                     ENVIRONMENT "TBBROOT")
         elseif(ANDROID)  # Should be before LINUX due LINUX is detected as well
